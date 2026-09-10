@@ -36,7 +36,7 @@ final class ChatDiscovery {
  void render(JSONObject local,Set<String> shown)throws Exception{
   if(query.isEmpty()||!query.equals(normalized(a.search)))return;
   LinearLayout box=a.content;a.space(box,12);
-  TextView heading=a.label(I18n.t("ГЛОБАЛЬНЫЙ ПОИСК"),11,a.GREEN);heading.setTypeface(null,1);box.addView(heading);a.space(box,10);
+  TextView heading=a.label(I18n.t("ГЛОБАЛЬНЫЙ ПОИСК"),11,a.GREEN);heading.setTypeface(null,android.graphics.Typeface.BOLD);box.addView(heading);a.space(box,10);
   int total=0;
   if(result!=null){
    JSONArray users=result.optJSONArray("users"),rooms=result.optJSONArray("rooms");

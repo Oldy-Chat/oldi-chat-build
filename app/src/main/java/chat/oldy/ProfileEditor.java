@@ -13,7 +13,7 @@ final class ProfileEditor {
   final Vault owner=a.vault;JSONObject data=owner.copy();String[] draft=drafts.remove(owner);if(draft!=null){data.put("name",draft[0]);data.put("bio",draft[1]);}LinearLayout b=a.col();
   LinearLayout hero=a.row();a.pad(hero,14);hero.setBackground(a.shape(a.CARD,22));
   Art avatar=a.art(data.optString("avatar","preset:0"),80,hero);avatar.setOnClickListener(v->a.avatarPicker(""));
-  LinearLayout identity=a.col();identity.setPadding(a.dp(16),0,0,0);TextView title=a.label(data.optString("name",owner.nick()),23,a.TEXT);title.setTypeface(null,1);identity.addView(title);
+  LinearLayout identity=a.col();identity.setPadding(a.dp(16),0,0,0);TextView title=a.label(data.optString("name",owner.nick()),23,a.TEXT);title.setTypeface(null,android.graphics.Typeface.BOLD);identity.addView(title);
   a.space(identity,5);TextView number=a.label(number(data),13,a.light?0xff366aaf:a.GREEN);number.setTypeface(Typeface.MONOSPACE);identity.addView(number);hero.addView(identity,new LinearLayout.LayoutParams(0,-2,1));b.addView(hero);
   a.space(b,12);TextView chooseAvatar=a.button(I18n.t("Выбрать аватар"),false,()->a.avatarPicker(""));b.addView(chooseAvatar);
   section(a,b,I18n.t("ИМЯ"));EditText name=a.field(b,I18n.t("Как тебя показывать в чате"),false);name.setText(data.optString("name"));name.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});
@@ -27,5 +27,5 @@ final class ProfileEditor {
   a.work.execute(()->{try{JSONObject fresh=a.api.call("/me",null,owner.token());owner.profile(fresh);a.runOnUiThread(()->{if(a.vault==owner)number.setText(number(fresh));});}catch(Exception ignored){}});
  }catch(Exception e){a.error(Api.message(e));}}
  static String number(JSONObject d){long n=d.optLong("account_number");return n>0?I18n.t("АККАУНТ № ")+String.format(java.util.Locale.ROOT,"%06d",n):I18n.t("Номер появится после синхронизации");}
- static void section(MainActivity a,LinearLayout b,String title){a.space(b,20);TextView name=a.label(title,11,a.light?0xff366aaf:a.GREEN);name.setTypeface(null,1);name.setLetterSpacing(.12f);b.addView(name);a.space(b,8);View line=new View(a);line.setBackgroundColor(a.light?0xffdbe5ef:0xff364458);b.addView(line,new LinearLayout.LayoutParams(-1,a.dp(1)));a.space(b,10);}
+ static void section(MainActivity a,LinearLayout b,String title){a.space(b,20);TextView name=a.label(title,11,a.light?0xff366aaf:a.GREEN);name.setTypeface(null,android.graphics.Typeface.BOLD);name.setLetterSpacing(.12f);b.addView(name);a.space(b,8);View line=new View(a);line.setBackgroundColor(a.light?0xffdbe5ef:0xff364458);b.addView(line,new LinearLayout.LayoutParams(-1,a.dp(1)));a.space(b,10);}
 }

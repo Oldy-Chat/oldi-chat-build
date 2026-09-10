@@ -24,7 +24,7 @@ final class WallpaperPicker {
     FrameLayout card=new FrameLayout(a);card.setBackground(new Wallpaper(a.light,style));card.setContentDescription(I18n.t(Wallpaper.NAMES[style]));
     card.setOutlineProvider(new ViewOutlineProvider(){public void getOutline(View view,Outline outline){outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),a.dp(18));}});card.setClipToOutline(true);
     LinearLayout captions=a.col();captions.setPadding(a.dp(10),a.dp(20),a.dp(9),a.dp(10));captions.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0x00121d31,0xe6121d31}));
-    TextView name=a.label((selected?"✓  ":"")+I18n.t(Wallpaper.NAMES[style]),12,Color.WHITE);name.setTypeface(null,1);name.setMaxLines(3);captions.addView(name);card.addView(captions,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+    TextView name=a.label((selected?"✓  ":"")+I18n.t(Wallpaper.NAMES[style]),12,Color.WHITE);name.setTypeface(null,android.graphics.Typeface.BOLD);name.setMaxLines(3);captions.addView(name);card.addView(captions,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
     card.setOnClickListener(v->{Notices.prefs(a).edit().putInt("wallpaper",style).putBoolean("wallpaper_photo",false).apply();if(a.activeSheet!=null)a.activeSheet.dismiss();a.refreshAppearance();Toast.makeText(a,I18n.t("Тема применена ко всему приложению"),Toast.LENGTH_SHORT).show();});
     LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,a.dp(145),1);if(column==0)lp.rightMargin=a.dp(10);pair.addView(card,lp);
    }body.addView(pair);a.space(body,10);

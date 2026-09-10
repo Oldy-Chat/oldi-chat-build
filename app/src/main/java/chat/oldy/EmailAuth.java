@@ -11,7 +11,7 @@ final class EmailAuth {
  static void show(MainActivity a,boolean signup){
   a.base("auth");ScrollView scroll=new ScrollView(a);LinearLayout b=a.col();scroll.addView(b);a.root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   BrandMark brand=new BrandMark(a,a.light);b.addView(brand,new LinearLayout.LayoutParams(-1,a.dp(72)));a.space(b,20);
-  TextView title=a.label(signup?I18n.t("Добро пожаловать"):I18n.t("Снова на связи"),28,a.TEXT);title.setTypeface(null,1);b.addView(title);a.space(b,8);a.paragraph(b,signup?I18n.t("Твой профиль, свои люди и любимые каналы."):I18n.t("Введи почту. Пришлём шестизначный код входа."));a.space(b,22);
+  TextView title=a.label(signup?I18n.t("Добро пожаловать"):I18n.t("Снова на связи"),28,a.TEXT);title.setTypeface(null,android.graphics.Typeface.BOLD);b.addView(title);a.space(b,8);a.paragraph(b,signup?I18n.t("Твой профиль, свои люди и любимые каналы."):I18n.t("Введи почту. Пришлём шестизначный код входа."));a.space(b,22);
   LinearLayout tabs=a.row();tabs.addView(a.button(I18n.t("Войти"),!signup,()->show(a,false)),new LinearLayout.LayoutParams(0,a.dp(46),1));tabs.addView(a.button(I18n.t("Регистрация"),signup,()->show(a,true)),new LinearLayout.LayoutParams(0,a.dp(46),1));b.addView(tabs);a.space(b,18);
   EditText name=signup?a.field(b,I18n.t("Как тебя зовут?"),false):null;
   EditText nick=signup?a.field(b,I18n.t("@ник · латиница, цифры, _"),false):null;

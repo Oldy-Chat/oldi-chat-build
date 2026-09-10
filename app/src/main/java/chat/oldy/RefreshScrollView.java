@@ -28,7 +28,7 @@ final class RefreshScrollView extends ScrollView {
   return true;
  }
  protected void dispatchDraw(Canvas canvas){super.dispatchDraw(canvas);if(!dragging&&!refreshing)return;
-  String text=I18n.t(refreshing?"Обновляем подключение…":pull>=a.dp(82)?"Отпусти, чтобы обновить":"Потяни вниз для обновления");paint.setTextSize(a.dp(12));paint.setTypeface(Typeface.create("sans-serif-medium",0));float w=paint.measureText(text)+a.dp(40),left=(getWidth()-w)/2,top=getScrollY()+a.dp(12);
+  String text=I18n.t(refreshing?"Обновляем подключение…":pull>=a.dp(82)?"Отпусти, чтобы обновить":"Потяни вниз для обновления");paint.setTextSize(a.dp(12));paint.setTypeface(Typeface.create("sans-serif-medium",android.graphics.Typeface.NORMAL));float w=paint.measureText(text)+a.dp(40),left=(getWidth()-w)/2,top=getScrollY()+a.dp(12);
   paint.setColor(a.CARD);canvas.drawRoundRect(left,top,left+w,top+a.dp(42),a.dp(21),a.dp(21),paint);paint.setColor(a.TEXT);canvas.drawText(text,left+a.dp(20),top+a.dp(26),paint);
  }
 }
