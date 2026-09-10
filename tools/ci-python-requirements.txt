@@ -1,0 +1,3 @@
+# Server integration tests. No OpenAI SDK or API credentials are needed.
+cryptography>=44,<47
+Pillow>=11,<13

@@ -1,0 +1,13 @@
+# Preserved for future work. Disabled throughout the source migration.
+name: Future Aeza media VPS check (disabled)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - run: echo 'VPS checks are disabled; no SSH connection is attempted.'

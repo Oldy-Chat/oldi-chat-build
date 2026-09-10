@@ -1,0 +1,82 @@
+name: Verify Oldi Chat sources
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: oldi-verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reject secrets, signing keys and runtime data
+        run: python3 tools/check-source-policy.py
+  server:
+    needs: source-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: |
+          python -m pip install -r tools/ci-python-requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Run isolated server integration tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/reports
+          python tools/ci-server-tests.py 2>&1 | tee build/reports/server-tests.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-test-report
+          path: build/reports/server-tests.txt
+          retention-days: 14
+  android:
+    needs: source-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Check Java audio and YouTube link logic
+        run: |
+          mkdir -p build/java-checks
+          javac -d build/java-checks app/src/main/java/chat/oldy/AudioDsp.java tests/AudioDspCheck.java app/src/main/java/chat/oldy/YouTubeLinkDetector.java tests/YouTubeLinkCheck.java
+          java -cp build/java-checks chat.oldy.AudioDspCheck
+          java -cp build/java-checks chat.oldy.YouTubeLinkCheck
+      - name: Compile Android application and instrumentation sources; run lint
+        run: gradle --no-daemon :app:compileReleaseJavaWithJavac :app:compileReleaseAndroidTestJavaWithJavac :app:lintRelease
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-lint-reports
+          path: app/build/reports/lint-results-release.*
+          if-no-files-found: warn
+          retention-days: 14
