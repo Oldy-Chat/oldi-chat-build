@@ -1,7 +1,7 @@
 name: Verify Oldi Chat sources
 on:
   push:
-    branches: [main, fix/aeza-in-app-media]
+    branches: [main, fix/aeza-in-app-media, feat/calls-files-notes]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -50,7 +50,7 @@ jobs:
   android:
     needs: source-policy
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,6 +71,8 @@ jobs:
           javac -d build/java-checks app/src/main/java/chat/oldy/AudioDsp.java tests/AudioDspCheck.java app/src/main/java/chat/oldy/YouTubeLinkDetector.java tests/YouTubeLinkCheck.java
           java -cp build/java-checks chat.oldy.AudioDspCheck
           java -cp build/java-checks chat.oldy.YouTubeLinkCheck
+          javac -d build/java-checks app/src/main/java/chat/oldy/AttachmentCipher.java tests/AttachmentCipherCheck.java
+          java -Xmx64m -cp build/java-checks chat.oldy.AttachmentCipherCheck
       - name: Compile Android application and instrumentation sources; run lint
         run: gradle --no-daemon :app:compileReleaseJavaWithJavac :app:compileReleaseAndroidTestJavaWithJavac :app:lintRelease
       - uses: actions/upload-artifact@v4
@@ -90,6 +92,7 @@ jobs:
           python3 tools/prepare-speech.py
           bash tools/prepare-tunnel.sh
           bash tools/prepare-dpi.sh
+          bash tools/prepare-whisper.sh
       - name: Assemble unsigned update for signing on the owner workstation
         if: github.event_name != 'pull_request'
         run: |

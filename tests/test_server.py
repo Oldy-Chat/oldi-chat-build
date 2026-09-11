@@ -33,6 +33,15 @@ class RelayTest(unittest.TestCase):
   self.mod.LIMITS.clear()
   with self.mod.LOCK:
    self.mod.DB.execute("DELETE FROM archive");self.mod.DB.commit()
+ def test_attachment_limit_400_mib_and_recipient_access(self):
+  token=self.tokens['alice'];limit=400*1024*1024+12800*20
+  request={'kind':'blob','name':'Attachment.mp4','recipient':'bobby','room':'','size':limit}
+  code,result=self.request('/videos/start',request,token);self.assertEqual(code,200,result)
+  vid=result['id']
+  self.assertEqual(self.request('/videos/cancel',{'id':vid},self.tokens['eve_test'])[0],403)
+  self.assertEqual(self.request('/videos/cancel',{'id':vid},token)[0],200)
+  self.assertEqual(self.request('/videos/start',dict(request,size=limit+1),token)[0],400)
+  self.assertEqual(self.request('/videos/start',dict(request,size=True),token)[0],400)
  def test_youtube_rules_cannot_redirect_traffic(self):
   code,config=self.request('/youtube/config',token=self.tokens['alice']);self.assertEqual(code,200);self.assertEqual(set(config['domains']),set(self.mod.YOUTUBE_ROOTS));self.assertNotIn('proxy',config)
   path=self.mod.ROOT/'youtube-rules.json'
