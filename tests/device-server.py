@@ -16,6 +16,8 @@ relay.creator=lambda nick:nick=='alice'
 mail={}
 relay.mail_code=lambda email,code,**kwargs:mail.__setitem__(email,code)
 call_peer=None
+conference_peers=[]
+boot_polls=0
 class TestHandler(relay.Handler):
  def reply(self,obj,status=200):
   if self.path=='/call-config' and status==200 and os.environ.get('OLDY_TEST_TURN'):obj['relay_only']=True
@@ -30,6 +32,11 @@ class TestHandler(relay.Handler):
    os.environ['OLDY_STICKER_USERS']=nick
    sticker_generation.render_sheet=lambda photo,action:sheet()
    return self.reply({'provider':'test-fixture','live_ai_test':False})
+  if self.path=='/test-conference/start':
+   if not conference_peers:
+    from conference_peer import ConferencePeer
+    conference_peers.extend(ConferencePeer(folder/'server.crt',i) for i in range(1,5))
+   return self.reply({'started':True})
   if self.path=='/test-call/start':
    if call_peer is None:
     from call_peer import CallPeer
@@ -38,6 +45,13 @@ class TestHandler(relay.Handler):
   if self.path=='/test-call/ring':return self.reply(call_peer.incoming())
   return super().do_POST()
  def do_GET(self):
+  global boot_polls
+  if self.path=="/test-boot/status":return self.reply({"polls":boot_polls})
+  if self.path=="/poll":
+   try:
+    if self.user()=="alice":boot_polls+=1
+   except Exception:pass
+  if self.path=='/test-conference/status':return self.reply({'peers':[p.status() for p in conference_peers]})
   if self.path=='/test-call/status':return self.reply(call_peer.status() if call_peer else {'ready':False})
   if self.path.startswith('/test-code?'):
    email=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('email',[''])[0]

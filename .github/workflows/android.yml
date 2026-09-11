@@ -88,7 +88,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           sdkmanager 'ndk;28.2.13676358'
-          python3 -m pip install vosk
+          python3 -m pip install vosk aiortc
           python3 tools/prepare-speech.py
           bash tools/prepare-tunnel.sh
           bash tools/prepare-dpi.sh
@@ -130,6 +130,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
           script: bash tools/ci-android-checks.sh
       - uses: actions/upload-artifact@v4
         if: always()

@@ -38,7 +38,7 @@ class RelayTest(unittest.TestCase):
   request={'kind':'blob','name':'Attachment.mp4','recipient':'bobby','room':'','size':limit}
   code,result=self.request('/videos/start',request,token);self.assertEqual(code,200,result)
   vid=result['id']
-  self.assertEqual(self.request('/videos/cancel',{'id':vid},self.tokens['eve_test'])[0],403)
+  self.assertEqual(self.request('/videos/cancel',{'id':vid},self.tokens['eve_test'])[0],404)
   self.assertEqual(self.request('/videos/cancel',{'id':vid},token)[0],200)
   self.assertEqual(self.request('/videos/start',dict(request,size=limit+1),token)[0],400)
   self.assertEqual(self.request('/videos/start',dict(request,size=True),token)[0],400)
