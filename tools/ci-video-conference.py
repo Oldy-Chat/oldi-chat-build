@@ -7,10 +7,18 @@ log=(out/'conference-server.txt').open('w')
 server=subprocess.Popen(['python3','tests/device-server.py'],cwd=root,env=env,stdout=log,stderr=log)
 try:
  pin=root/'build/device-server/pin.txt';deadline=time.monotonic()+25
- while not pin.exists():
-  if server.poll() is not None or time.monotonic()>deadline:raise RuntimeError('Local video fixture failed to start')
+ while True:
+  if server.poll() is not None or time.monotonic()>deadline:raise RuntimeError('Local video fixture failed to start; see conference-server.txt')
+  try:
+   context=ssl.create_default_context(cafile=str(root/'build/device-server/server.crt'))
+   connection=http.client.HTTPSConnection('127.0.0.1',8444,context=context,timeout=2)
+   try:
+    connection.request('GET','/health');response=connection.getresponse()
+    ready=response.status==200 and json.load(response).get('service')=='oldy-chat'
+   finally:connection.close()
+   if ready and pin.is_file():break
+  except (OSError,ValueError):pass
   time.sleep(.2)
- time.sleep(1)
  for permission in ('CAMERA','RECORD_AUDIO','POST_NOTIFICATIONS'):subprocess.run(['adb','shell','pm','grant','chat.oldy','android.permission.'+permission],check=True)
  result=subprocess.run(['adb','shell','am','instrument','-w','-e','pin',pin.read_text().strip(),'chat.oldy.tests/chat.oldy.VideoConferenceInstrumentation'],capture_output=True,text=True,timeout=240)
  (out/'conference.txt').write_text(result.stdout);print(result.stdout,flush=True)

@@ -6,6 +6,7 @@ ui_result=$?
 timeout 100s adb shell am instrument -w chat.oldy.tests/chat.oldy.ConversationFeaturesInstrumentation | tee build/ui-report/conversation.txt
 grep -q OLDI_CONVERSATION_PASS build/ui-report/conversation.txt
 conversation_result=$?
+adb logcat -d -b crash > build/ui-report/conversation-errors.txt
 timeout 100s adb shell am instrument -w chat.oldy.tests/chat.oldy.MessageEditsInstrumentation | tee build/ui-report/edits.txt
 grep -q OLDI_EDITS_PASS build/ui-report/edits.txt
 edits_result=$?

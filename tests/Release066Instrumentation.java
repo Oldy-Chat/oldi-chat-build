@@ -4,6 +4,8 @@ import android.app.*;import android.content.*;import android.graphics.*;import a
 /** Local emulator fixtures only. Never registers an account or contacts production. */
 public class Release066Instrumentation extends Instrumentation {
  public void onCreate(Bundle args){start();}
+ public void runOnMainSync(Runnable action){java.util.concurrent.atomic.AtomicReference<Throwable> failure=new java.util.concurrent.atomic.AtomicReference<>();super.runOnMainSync(()->{try{action.run();}catch(Throwable error){failure.set(error);}});if(failure.get()!=null)throw new RuntimeException("Android UI assertion failed",failure.get());}
+
  volatile Activity resumed;
  public void callActivityOnResume(Activity a){super.callActivityOnResume(a);resumed=a;}
  void mark(String step){Bundle b=new Bundle();b.putString("stream","OLDI_066_STEP: "+step+"\n");sendStatus(1,b);}

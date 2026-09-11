@@ -57,7 +57,7 @@ final class MessageEdits {
    a.task(()->{
     if(a.vault!=account)throw new SecurityException("Аккаунт изменился");
     JSONObject current=account.message(mid);if(!canEdit(current)||!peer.equals(current.optString("peer")))throw new SecurityException("Сообщение уже недоступно");
-    if(!current.optString("text").equals(text)){a.prepareRoom(peer);if(!Conversation.community(peer))account.pin(a.api.call("/user/"+peer,null,account.token()));account.queuePayload(peer,payload(current,text),null);}
+    if(!current.optString("text").equals(text)){account.queuePayload(peer,payload(current,text),null);}
     a.runOnUiThread(()->{dialog.dismiss();if(a.vault==account&&peer.equals(a.chat))a.renderMessages();});
    });
   });body.addView(save);body.addView(a.button("Отмена",false,dialog::dismiss));dialog.show();if(dialog.getWindow()!=null)dialog.getWindow().setLayout(-1,-2);
