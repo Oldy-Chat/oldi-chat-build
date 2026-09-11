@@ -36,7 +36,10 @@ def main():
    ssh.stdin.write(json.dumps(payload).encode()+b'\n');ssh.stdin.flush()
    if not select.select([ssh.stdout],[],[],30)[0]:raise RuntimeError('VPS_FIXTURE_TIMEOUT')
    line=ssh.stdout.readline()
-   if not line:raise RuntimeError('VPS_FIXTURE_FAILED')
+   if not line:
+    failure=ssh.stderr.read().decode(errors='replace')
+    code=re.search(r'RuntimeError: (WRONG_HOST|ACCOUNT_ENDPOINT_UNAVAILABLE|INVALID_CREDENTIAL_ACCEPTED)',failure)
+    raise RuntimeError(code.group(1) if code else 'VPS_FIXTURE_FAILED')
    report=json.loads(line)
    if not report.get('ready'):raise RuntimeError('VPS_FIXTURE_FAILED')
    (directory/'reference.jpg').write_bytes(base64.b64decode(report['reference']))
@@ -55,6 +58,12 @@ def main():
    print(output,flush=True)
    if result.returncode or 'OLDI_MEDIA_ROUTE_PASS' not in output:raise RuntimeError('ANDROID_MEDIA_ROUTE_FAILED')
   finally:
+   destination=ROOT/'build/ui-report';destination.mkdir(parents=True,exist_ok=True)
+   try:
+    adb('pull','/sdcard/Android/data/chat.oldy/files/review/.',str(destination),check=False)
+    log=adb('logcat','-d','-s','AndroidRuntime:E',check=False)
+    (destination/'media-android-errors.txt').write_text(log.stdout.replace(token,'[masked]'))
+   except Exception:pass
    if ssh:
     if ssh.stdin: ssh.stdin.close()
     try:ssh.wait(timeout=10)

@@ -44,6 +44,8 @@ final class MediaService {
   if(!YouTubeDomainRules.allowed(host))throw new IOException("DOMAIN_DENIED");
   Socket transport=new Socket();SSLSocket tls=null;
   try{
+   // Allocate the OS file descriptor before protect(); an unbound Java Socket has none.
+   transport.bind(new InetSocketAddress(0));
    if(!service.protect(transport))throw new IOException("PROTECT_FAILED");network.bindSocket(transport);
    transport.connect(new InetSocketAddress(HOST,PORT),10000);
    tls=(SSLSocket)factory(service).createSocket(transport,HOST,PORT,true);tls.setSoTimeout(15000);tls.startHandshake();
