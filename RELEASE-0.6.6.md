@@ -34,3 +34,12 @@ sticker generation check. A successful health response is not a YouTube playback
 test. Real account sign-in, mobile playback and installation over the owner's
 existing app still require the owner's device. Do not mark them as tested based
 on the emulator fixture or direct HTTP headers.
+
+## Recorded server result (2026-09-11)
+
+Actions run 34549997288 deployed the independent service successfully. The bounded
+live description test generated a 384×384 transparent WebP with 6 frames,
+262,542 bytes, in 15.7 seconds. SHA-256:
+0ce32166528d6cc57cb62a1600e257670f0fb72163f014a6cc33878d696282f3.
+This verifies the provider connection and frame assembly on the new VPS. It does
+not by itself verify a phone's authenticated creation/save/send workflow.
