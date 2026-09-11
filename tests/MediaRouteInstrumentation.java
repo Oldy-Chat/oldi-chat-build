@@ -14,8 +14,10 @@ public class MediaRouteInstrumentation extends Release066Instrumentation {
   Vault vault=ChatService.vault(c);JSONObject identity=vault.identity();vault.account(new JSONObject().put("token",credential).put("user",new JSONObject().put("nick","alice").put("name","CI Alice").put("enc",identity.getString("enc")).put("sig",identity.getString("sig")).put("accepted_policy","fixture")));
   // Negative control proves a successful WebView cannot be using direct YouTube.
   boolean directBlocked=false;try(Socket direct=new Socket()){direct.connect(new InetSocketAddress("142.250.184.206",443),2500);}catch(IOException expected){directBlocked=true;}check(directBlocked,"Direct YouTube TLS was not blocked");mark("direct-443-blocked");
+  String youtubeFailure="";boolean videoPlayed=false;long until;
+  try{
   hub=(YouTubeHubActivity)launch(new Intent(c,YouTubeHubActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),YouTubeHubActivity.class);
-  long until=SystemClock.elapsedRealtime()+70000;while(!TunnelStateRepository.on()&&SystemClock.elapsedRealtime()<until)Thread.sleep(150);
+  until=SystemClock.elapsedRealtime()+70000;while(!TunnelStateRepository.on()&&SystemClock.elapsedRealtime()<until)Thread.sleep(150);
   check(TunnelStateRepository.on(),"Aeza preflight failed: "+TunnelStateRepository.lastError(c));mark("aeza-connect-and-youtube-tls-verified");
   YouTubeHubActivity view=hub;String page="";until=SystemClock.elapsedRealtime()+65000;
   while(SystemClock.elapsedRealtime()<until){page=js(view.web,"JSON.stringify({title:document.title,body:document.body?document.body.innerText.slice(0,1000):''})");if(page.contains("YouTube")&&!page.contains("ERR_"))break;Thread.sleep(1000);}
@@ -30,8 +32,10 @@ public class MediaRouteInstrumentation extends Release066Instrumentation {
   String playback=js(view.web,"JSON.stringify([...document.querySelectorAll('video')].map(v=>({time:v.currentTime,ready:v.readyState,paused:v.paused,error:v.error?v.error.code:0})))");
   mark("playback-state: "+playback);shot("067-youtube-video");
   // Do not turn a failed player into a successful result. Keep evidence for diagnosis.
-  boolean videoPlayed=false;Object raw=new JSONTokener(playback).nextValue();if(raw instanceof String){JSONArray states=new JSONArray((String)raw);for(int n=0;n<states.length();n++){JSONObject state=states.getJSONObject(n);if(state.optDouble("time")>0&&state.optInt("ready")>=2)videoPlayed=true;}}
-  runOnMainSync(view::finish);LocalTunnelService.stop(c);Thread.sleep(2000);
+  Object raw=new JSONTokener(playback).nextValue();if(raw instanceof String){JSONArray states=new JSONArray((String)raw);for(int n=0;n<states.length();n++){JSONObject state=states.getJSONObject(n);if(state.optDouble("time")>0&&state.optInt("ready")>=2)videoPlayed=true;}}
+  runOnMainSync(view::finish);
+  }catch(Throwable routeError){youtubeFailure=routeError.getMessage();mark("youtube-check-failed: "+youtubeFailure);}
+  YouTubeHubActivity opened=hub;if(opened!=null)runOnMainSync(opened::finish);LocalTunnelService.stop(c);Thread.sleep(2000);
   // Photo edit endpoint, Android decode, preview, account collection save and reload.
   StickerEditorActivity editor=(StickerEditorActivity)launch(new Intent(c,StickerEditorActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),StickerEditorActivity.class);
   Bitmap photo=BitmapFactory.decodeFile(new File(c.getExternalFilesDir(null),"reference.jpg").getPath());check(photo!=null,"Missing diagnostic reference");
@@ -40,7 +44,7 @@ public class MediaRouteInstrumentation extends Release066Instrumentation {
   PersonalStickerStore store=new PersonalStickerStore(c,"alice");JSONObject saved=store.read(id);check(saved.getString("owner").equals("alice"),"Wrong sticker owner");check(MediaService.call(c,"/stickers/collection/"+id,null,credential).getString("id").equals(id),"Server collection lost sticker");mark("photo-sticker-created-saved-and-reloaded");
   StickerEditorActivity text=(StickerEditorActivity)launch(new Intent(c,StickerEditorActivity.class).putExtra("text_mode",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),StickerEditorActivity.class);
   runOnMainSync(()->{text.description.setText("A small cheerful blue penguin with an orange scarf waving one flipper");text.generate();});awaitSticker(text);shot("067-description-sticker-ready");runOnMainSync(text::finish);mark("description-sticker-created");
-  check(videoPlayed,"YouTube page loaded through Aeza but playback was not confirmed");
+  check(youtubeFailure.isEmpty(),youtubeFailure);check(videoPlayed,"YouTube page loaded through Aeza but playback was not confirmed");
   result.putString("stream","OLDI_MEDIA_ROUTE_PASS: blocked direct 443; YouTube page and playback through Aeza; real photo and text generation; Android preview; account save and reload\n");finish(-1,result);
  }catch(Throwable error){result.putString("stream","OLDI_MEDIA_ROUTE_FAIL: "+android.util.Log.getStackTraceString(error));finish(0,result);}finally{LocalTunnelService.stop(getTargetContext());}}
 }
