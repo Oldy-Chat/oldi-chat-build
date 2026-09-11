@@ -12,12 +12,14 @@ spec.loader.exec_module(patcher)
 class CloudFilePatchTest(unittest.TestCase):
     def source(self):
         return (ROOT / 'server/server.py').read_text().replace('419686400 if kind', '26214416 if kind').replace(
-            "'blob_iv','blob_format','document'", "'blob_iv'")
+            "'blob_iv','blob_format','document'", "'blob_iv'").replace(",'edit_id','edit_version'", "").replace(",'edit_version','edit_id'", "").replace(",'edit'", "").replace(patcher.EDIT_VALIDATION, "")
 
     def test_patch_preserves_every_unrelated_byte_and_newer_changes(self):
         old = self.source() + '\n# A newer server-side change must survive.\n'
         expected = old.replace('26214416 if kind', '419686400 if kind').replace(
-            "'op','mid','emoji'}", "'op','mid','emoji','blob_format','document'}")
+            "'op','mid','emoji'}", "'op','mid','emoji','blob_format','document','edit_id','edit_version'}").replace("('reaction','pin','unpin')", "('reaction','pin','unpin','edit')").replace("('publish','reaction','pin','unpin','signal','comment')", "('publish','reaction','pin','unpin','signal','comment','edit')")
+        anchor="  if op=='reaction' and body.get('emoji','') not in ('','👍','❤️','🔥','😂','🤯','🎮'):raise Problem(400,'Неизвестная реакция')\n"
+        expected=expected.replace(anchor, anchor+patcher.EDIT_VALIDATION)
         self.assertEqual(patcher.patch_source(old), expected)
         self.assertEqual(patcher.patch_source(expected), expected)
 

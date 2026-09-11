@@ -212,7 +212,7 @@ def store_channel_history(nick,data):
  if not isinstance(rid,str) or not isinstance(mid,str) or not re.fullmatch('[a-f0-9-]{36}',mid) or not isinstance(record['time'],int) or record['time']<1 or record['time']>time.time()*1000+300000:raise Problem(400,'Неверная публикация')
  room=room_info(rid,nick)
  if room['kind']!='channel':raise Problem(400,'Это не канал')
- fields={'kind','text','room','thread','mime','size','name','sha256','sticker','reply','link','thumb','cloud_video','round','animated','cloud_blob','blob_key','blob_iv','blob_format','document','duration','waveform','transcript','transcript_language','silent','mini','mini_update','custom_sticker','sticker_id','sticker_author','op','mid','emoji'}
+ fields={'kind','text','room','thread','mime','size','name','sha256','sticker','reply','link','thumb','cloud_video','round','animated','cloud_blob','blob_key','blob_iv','blob_format','document','duration','waveform','transcript','transcript_language','silent','mini','mini_update','custom_sticker','sticker_id','sticker_author','op','mid','emoji','edit_id','edit_version'}
  if not isinstance(body,dict) or set(body)-fields or body.get('room')!=rid or body.get('kind') not in ('text','file','sticker','control'):raise Problem(400,'Неверное содержимое')
  if body.get('custom_sticker') and (body.get('kind')!='file' or body.get('mime')!='image/webp' or type(body.get('size')) is not int or not 1<=body['size']<=350000 or not isinstance(body.get('sticker_id'),str) or not re.fullmatch('[a-f0-9-]{36}',body['sticker_id']) or body.get('sticker_author')!=nick):raise Problem(400,'Неверный авторский стикер')
  if 'duration' in body and (not isinstance(body['duration'],int) or not 0<=body['duration']<=86400000):raise Problem(400,'Неверная длительность')
@@ -232,9 +232,17 @@ def store_channel_history(nick,data):
   if not isinstance(target,str) or gone(target,rid):raise Problem(410,'Публикация удалена')
   post=DB.execute('SELECT room,thread FROM posts WHERE mid=?',(target,)).fetchone()
   if not post or post!=(rid,thread):raise Problem(404,'Публикация не найдена')
-  if op not in ('reaction','pin','unpin'):raise Problem(400,'Неверное действие')
+  if op not in ('reaction','pin','unpin','edit'):raise Problem(400,'Неверное действие')
   if op in ('pin','unpin') and room['owner']!=nick:raise Problem(403,'Закрепляет владелец канала')
   if op=='reaction' and body.get('emoji','') not in ('','👍','❤️','🔥','😂','🤯','🎮'):raise Problem(400,'Неизвестная реакция')
+  if op=='edit':
+   if DB.execute('SELECT author FROM posts WHERE mid=?',(target,)).fetchone()!=(nick,):raise Problem(403,'Изменить сообщение может только автор')
+   previous=DB.execute('SELECT body FROM channel_history WHERE mid=? AND room=?',(target,rid)).fetchone()
+   if not previous:raise Problem(404,'Исходное сообщение ещё не сохранено')
+   original=json.loads(open_channel_record(rid,target,previous[0])['record'])['payload']
+   if original.get('kind') not in ('text','file') or any(k in original for k in ('mini','mini_update','watch')) or original.get('custom_sticker'):raise Problem(400,'Это сообщение нельзя редактировать')
+   if not isinstance(body.get('text'),str) or len(body['text'].encode())>10000 or original['kind']=='text' and not body['text'].strip():raise Problem(400,'Неверный текст правки')
+   if type(body.get('edit_version')) is not int or not 1<=body['edit_version']<=record['time']+300000 or not isinstance(body.get('edit_id'),str) or not re.fullmatch('[a-f0-9-]{36}',body['edit_id']):raise Problem(400,'Неверная версия правки')
  else:
   if body['kind']=='file':
    if not isinstance(body.get('size'),int) or not 0<body['size']<=2147483648 or not isinstance(body.get('sha256'),str) or not re.fullmatch('[a-fA-F0-9]{64}',body['sha256']):raise Problem(400,'Неверное вложение')
@@ -1260,7 +1268,7 @@ class Handler(BaseHTTPRequestHandler):
     verify_envelope(e,nick)
     public_user(target)
     route=e.get('room','');action=e.get('action','publish')
-    if action not in ('publish','reaction','pin','unpin','signal','comment'):raise Problem(400,'Неизвестное действие')
+    if action not in ('publish','reaction','pin','unpin','signal','comment','edit'):raise Problem(400,'Неизвестное действие')
     if route:
      room=room_info(str(route),nick)
      if e.get('thread'):

@@ -99,6 +99,30 @@ class RelayTest(unittest.TestCase):
   self.assertEqual(self.request('/posts/delete',{'room':rid,'mid':mid},owner)[0],200)
   self.assertEqual(self.request('/channels/history?room='+rid,token=viewer)[1]['items'],[])
   self.assertEqual(self.request('/channels/history/store',publication,owner)[0],410)
+ def test_edits_are_authorized_durable_and_keep_original_publication(self):
+  owner=self.tokens['alice'];viewer=self.tokens['bobby'];late=self.tokens['eve_test']
+  _,room=self.request('/room/create',{'kind':'channel','title':'Edited history','public':True,'members':['bobby']},owner);rid=room['id']
+  original=self.channel_record(rid,text='Before edit');mid=json.loads(original['record'])['id']
+  self.assertEqual(self.request('/channels/history/store',original,owner)[0],200)
+  control={'kind':'control','op':'edit','mid':mid,'text':'After edit','edit_version':int(time.time()*1000),'edit_id':str(uuid.uuid4())}
+  forged=self.channel_record(rid,nick='bobby',control=control)
+  self.assertEqual(self.request('/channels/history/store',forged,viewer)[0],403)
+  for bad in ({'text':''},{'text':'x'*10001},{'edit_version':True},{'edit_id':'bad'},{'edit_version':int(time.time()*1000)+600000}):
+   self.assertEqual(self.request('/channels/history/store',self.channel_record(rid,control=dict(control,**bad)),owner)[0],400)
+  edit=self.channel_record(rid,control=control);self.assertEqual(self.request('/channels/history/store',edit,owner)[0],200)
+  self.assertEqual(self.request('/channels/history/store',edit,owner)[0],200,'retry must be idempotent')
+  self.assertEqual(self.request('/channels/history/store',original,owner)[0],200,'original signature must remain valid')
+  self.assertEqual(self.request('/room/join',{'id':rid},late)[0],200)
+  with self.mod.LOCK:self.mod.DB.close();self.mod.init_db()
+  items=self.request('/channels/history?room='+rid,token=late)[1]['items']
+  self.assertEqual([i['record'] for i in items],[original['record'],edit['record']])
+  comment=self.channel_record(rid,nick='bobby',thread=mid,text='Comment before');comment_id=json.loads(comment['record'])['id']
+  self.assertEqual(self.request('/channels/history/store',comment,viewer)[0],200)
+  own_comment_edit=self.channel_record(rid,nick='bobby',thread=mid,control=dict(control,mid=comment_id,text='Comment after'))
+  self.assertEqual(self.request('/channels/history/store',own_comment_edit,viewer)[0],200)
+  self.assertEqual(self.request('/channels/history/store',self.channel_record(rid,thread=mid,control=dict(control,mid=comment_id)),owner)[0],403,'Channel owner cannot rewrite another author')
+  self.assertEqual(self.request('/posts/delete',{'room':rid,'mid':mid},owner)[0],200)
+  self.assertEqual(self.request('/channels/history/store',edit,owner)[0],410,'Edit must not resurrect deleted history')
  def test_channel_history_pagination_and_room_deletion(self):
   owner=self.tokens['alice'];_,room=self.request('/room/create',{'kind':'channel','title':'Many posts','members':[]},owner);rid=room['id']
   for i in range(23):self.assertEqual(self.request('/channels/history/store',self.channel_record(rid,text='Post '+str(i)),owner)[0],200)

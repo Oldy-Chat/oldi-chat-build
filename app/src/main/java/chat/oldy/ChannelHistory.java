@@ -13,10 +13,11 @@ import javax.crypto.spec.*;
  * and group envelopes retain their separate end-to-end encrypted history. */
 final class ChannelHistory {
  static final String DOMAIN="oldy-channel-v1\n";
- static final String[] FIELDS={"kind","text","mime","size","name","sha256","sticker","reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","blob_format","document","duration","waveform","custom_sticker","sticker_id","sticker_author","op","mid","emoji"};
+ static final String[] FIELDS={"kind","text","mime","size","name","sha256","sticker","reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","blob_format","document","duration","waveform","custom_sticker","sticker_id","sticker_author","op","mid","emoji","edit_version","edit_id"};
  static JSONObject signed(Vault vault,JSONObject m)throws Exception{
   JSONObject source=m.optString("kind").equals("control")?m.getJSONObject("control"):m,p=new JSONObject();
   for(String k:FIELDS)if(source.has(k))p.put(k,source.get(k));
+  JSONObject original=m.optJSONObject("edit_original");if(original!=null&&!m.optString("kind").equals("control")){p.put("text",original.optString("text"));p.remove("link");if(original.has("link"))p.put("link",original.get("link"));}
   String target=m.getString("peer");p.put("room",Conversation.room(target));if(Conversation.thread(target))p.put("thread",Conversation.post(target));
   String raw=new JSONObject().put("v",1).put("id",m.getString("id")).put("room",Conversation.room(target)).put("from",vault.nick()).put("time",m.getLong("time")).put("payload",p).toString();
   Signature sig=Signature.getInstance("SHA256withECDSA");sig.initSign(KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(Crypto.un64(vault.identity().getString("sigPrivate")))));sig.update(Crypto.bytes(DOMAIN+raw));

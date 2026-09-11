@@ -1,7 +1,7 @@
 name: Verify Oldi Chat sources
 on:
   push:
-    branches: [main, fix/aeza-in-app-media, feat/calls-files-notes]
+    branches: [main, fix/aeza-in-app-media, feat/calls-files-notes, feat/calls-files-notes-validation]
   pull_request:
   workflow_dispatch:
 permissions:

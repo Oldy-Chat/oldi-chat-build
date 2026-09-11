@@ -21,6 +21,17 @@ PIN = 'a84186ad26b22e7d69f23d1838a9db5a2b277a6d567d6e49249c7714153e5d4a'
 LIMIT = 419686400  # 400 MiB of plaintext, including authenticated record overhead.
 
 
+EDIT_VALIDATION = """  if op=='edit':
+   if DB.execute('SELECT author FROM posts WHERE mid=?',(target,)).fetchone()!=(nick,):raise Problem(403,'Изменить сообщение может только автор')
+   previous=DB.execute('SELECT body FROM channel_history WHERE mid=? AND room=?',(target,rid)).fetchone()
+   if not previous:raise Problem(404,'Исходное сообщение ещё не сохранено')
+   original=json.loads(open_channel_record(rid,target,previous[0])['record'])['payload']
+   if original.get('kind') not in ('text','file') or any(k in original for k in ('mini','mini_update','watch')) or original.get('custom_sticker'):raise Problem(400,'Это сообщение нельзя редактировать')
+   if not isinstance(body.get('text'),str) or len(body['text'].encode())>10000 or original['kind']=='text' and not body['text'].strip():raise Problem(400,'Неверный текст правки')
+   if type(body.get('edit_version')) is not int or not 1<=body['edit_version']<=record['time']+300000 or not isinstance(body.get('edit_id'),str) or not re.fullmatch('[a-f0-9-]{36}',body['edit_id']):raise Problem(400,'Неверная версия правки')
+"""
+
+
 def patch_source(source):
     tree = ast.parse(source)
     limits = [n.body for n in ast.walk(tree)
@@ -53,11 +64,38 @@ def patch_source(source):
     existing = {n.value for n in fields[0].elts}
     if not {'cloud_blob', 'blob_key', 'blob_iv'}.issubset(existing):
         raise ValueError('Сервер ещё не поддерживает зашифрованные вложения.')
-    missing = {'blob_format', 'document'} - existing
+    missing = {'blob_format', 'document', 'edit_version', 'edit_id'} - existing
     if missing:
         start, end = span(fields[0])
         before = source.encode()[start:end]
         edits.append((start, end, before[:-1] + b',' + ','.join(repr(f) for f in sorted(missing)).encode() + b'}'))
+    # Add one control operation without replacing the server or touching storage schema.
+    for variable, required in [('op', {'reaction', 'pin', 'unpin'}),
+                               ('action', {'publish', 'reaction', 'pin', 'unpin', 'signal', 'comment'})]:
+        checks = [n.comparators[0] for n in ast.walk(tree)
+                  if isinstance(n, ast.Compare) and isinstance(n.left, ast.Name)
+                  and n.left.id == variable and len(n.ops) == 1 and isinstance(n.ops[0], ast.NotIn)
+                  and isinstance(n.comparators[0], ast.Tuple)]
+        matches = [n for n in checks if required.issubset({x.value for x in n.elts if isinstance(x, ast.Constant)})]
+        if len(matches) != 1:
+            raise ValueError('Неизвестная проверка действий. Код не изменён.')
+        node = matches[0]
+        if 'edit' not in {x.value for x in node.elts if isinstance(x, ast.Constant)}:
+            start, end = span(node)
+            edits.append((start, end, source.encode()[start:end - 1] + b",'edit')"))
+    controls = [n for n in ast.walk(functions[0]) if isinstance(n, ast.If)
+                and ast.dump(n.test) == ast.dump(ast.parse("body['kind'] == 'control'", mode='eval').body)]
+    if len(controls) != 1:
+        raise ValueError('Неизвестная обработка правок. Код не изменён.')
+    control = controls[0]
+    edit_checks = [n for n in control.body if isinstance(n, ast.If)
+                   and ast.dump(n.test) == ast.dump(ast.parse("op == 'edit'", mode='eval').body)]
+    if edit_checks:
+        if len(edit_checks) != 1 or ast.dump(edit_checks[0]) != ast.dump(ast.parse(EDIT_VALIDATION.strip().replace('\n   ', '\n ')).body[0]):
+            raise ValueError('На сервере другая обработка правок. Код не изменён.')
+    else:
+        insertion = offsets[control.body[-1].end_lineno]
+        edits.append((insertion, insertion, EDIT_VALIDATION.encode()))
     result = source.encode()
     for start, end, replacement in sorted(edits, reverse=True):
         result = result[:start] + replacement + result[end:]
@@ -133,7 +171,7 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         backup = Path('/var/lib/oldy-chat/update-backups') / ('files-400-' + str(time.time_ns()))
         changed = install_patch(path, backup, restart)
-    print('Cloud поддерживает файлы до 400 МБ. Аккаунты и история сохранены.')
+    print('Cloud поддерживает файлы до 400 МБ и редактирование сообщений. Аккаунты и история сохранены.')
     if changed:
         print('Предыдущий код: ' + str(backup / 'server.py'))
 
