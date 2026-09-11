@@ -134,6 +134,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
   return self.server.verify(header[7:])
  def do_GET(self):self.api(False)
  def do_POST(self):self.api(True)
+ def body(self,length):
+  # CONNECT must remain unbuffered, but SocketIO.read(n) may return only one
+  # TLS record/network packet. Accumulate the bounded POST body explicitly.
+  chunks=[];remaining=length;deadline=time.monotonic()+30
+  while remaining:
+   timeout=deadline-time.monotonic()
+   if timeout<=0:raise Problem(408,'BODY_TIMEOUT')
+   self.connection.settimeout(timeout)
+   chunk=self.rfile.read(min(65536,remaining))
+   if not chunk:raise Problem(400,'BODY_INVALID')
+   chunks.append(chunk);remaining-=len(chunk)
+  return b''.join(chunks)
  def api(self,post):
   try:
    if self.path=='/health' and not post:return self.json(200,{'service':'oldi-media','version':1,'youtube_proxy':True})
@@ -145,7 +157,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
    data={}
    if post:
     try:
-     raw=self.rfile.read(length)
+     raw=self.body(length)
      if len(raw)!=length:raise ValueError()
      data=json.loads(raw)
      if not isinstance(data,dict):raise ValueError()

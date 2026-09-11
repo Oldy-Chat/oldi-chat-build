@@ -70,6 +70,23 @@ class MediaTest(unittest.TestCase):
     self.assertEqual(self.request('/stickers/generate',body)[0],400)
    self.assertEqual(self.request('/stickers/collection',token='bad')[0],401);provider.assert_not_called()
   self.assertEqual(self.request('/health',token='')[1]['service'],'oldi-media')
+ def test_photo_upload_arriving_in_separate_network_packets(self):
+  photo=io.BytesIO()
+  generation.Image.new('RGB',(512,512),(110,80,65)).save(photo,format='JPEG')
+  body=json.dumps({'id':str(uuid.uuid4()),'image':base64.b64encode(photo.getvalue()).decode(),'action':'wave','consent_version':1}).encode()
+  with patch.object(generation,'render_sheet',return_value=sheet()):
+   with socket.create_connection(('127.0.0.1',self.server.server_port),5) as c:
+    c.sendall(('POST /stickers/generate HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer alice-fixture\r\nContent-Type: application/json\r\nContent-Length: '+str(len(body))+'\r\n\r\n').encode())
+    c.sendall(body[:200]);time.sleep(.15)
+    try:c.sendall(body[200:])
+    except BrokenPipeError:pass
+    response=http.client.HTTPResponse(c);response.begin();value=json.loads(response.read())
+    self.assertEqual(response.status,200,value)
+   deadline=time.monotonic()+8
+   while time.monotonic()<deadline:
+    with self.state.LOCK:active=self.state.DB.execute("SELECT count(*) FROM sticker_jobs WHERE state='generating'").fetchone()[0]
+    if not active:break
+    time.sleep(.05)
  def test_description_uses_official_generation_endpoint_without_photo_or_retry(self):
   response=json.dumps({'data':[{'b64_json':base64.b64encode(b'fixture').decode()}]}).encode()
   with patch.object(generation.urllib.request,'build_opener') as opener:
