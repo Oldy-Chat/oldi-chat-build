@@ -212,7 +212,7 @@ def store_channel_history(nick,data):
  if not isinstance(rid,str) or not isinstance(mid,str) or not re.fullmatch('[a-f0-9-]{36}',mid) or not isinstance(record['time'],int) or record['time']<1 or record['time']>time.time()*1000+300000:raise Problem(400,'Неверная публикация')
  room=room_info(rid,nick)
  if room['kind']!='channel':raise Problem(400,'Это не канал')
- fields={'kind','text','room','thread','mime','size','name','sha256','sticker','reply','link','thumb','cloud_video','round','animated','cloud_blob','blob_key','blob_iv','duration','waveform','transcript','transcript_language','silent','mini','mini_update','custom_sticker','sticker_id','sticker_author','op','mid','emoji'}
+ fields={'kind','text','room','thread','mime','size','name','sha256','sticker','reply','link','thumb','cloud_video','round','animated','cloud_blob','blob_key','blob_iv','blob_format','document','duration','waveform','transcript','transcript_language','silent','mini','mini_update','custom_sticker','sticker_id','sticker_author','op','mid','emoji'}
  if not isinstance(body,dict) or set(body)-fields or body.get('room')!=rid or body.get('kind') not in ('text','file','sticker','control'):raise Problem(400,'Неверное содержимое')
  if body.get('custom_sticker') and (body.get('kind')!='file' or body.get('mime')!='image/webp' or type(body.get('size')) is not int or not 1<=body['size']<=350000 or not isinstance(body.get('sticker_id'),str) or not re.fullmatch('[a-f0-9-]{36}',body['sticker_id']) or body.get('sticker_author')!=nick):raise Problem(400,'Неверный авторский стикер')
  if 'duration' in body and (not isinstance(body['duration'],int) or not 0<=body['duration']<=86400000):raise Problem(400,'Неверная длительность')
@@ -850,7 +850,7 @@ class Handler(BaseHTTPRequestHandler):
     else:raise Problem(400,'Неизвестная загрузка')
     rate(('video-start',nick),20,3600)
     size=data.get('size');name=str(data.get('name','Видео.mp4'))[:120]
-    if not isinstance(size,int) or isinstance(size,bool) or not 12<=size<=(26214416 if kind=='blob' else 33554432 if kind=='round' else 2147483648) or not name.lower().endswith('.mp4'):raise Problem(400,'Превышен размер MP4')
+    if not isinstance(size,int) or isinstance(size,bool) or not 12<=size<=(419686400 if kind=='blob' else 33554432 if kind=='round' else 2147483648) or not name.lower().endswith('.mp4'):raise Problem(400,'Превышен размер MP4')
     if shutil.disk_usage(ROOT).free<size+268435456:raise Problem(507,'На сервере недостаточно места для этого видео')
     vid=str(uuid.uuid4())
     with LOCK:DB.execute('INSERT INTO videos(id,owner,room,name,size,kind,recipient) VALUES(?,?,?,?,?,?,?)',(vid,nick,rid,name,size,kind,recipient));DB.commit()

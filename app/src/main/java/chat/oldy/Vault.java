@@ -86,7 +86,7 @@ final class Vault {
   revealChat(to);String id=java.util.UUID.randomUUID().toString();long now=System.currentTimeMillis();JSONObject p=new JSONObject(body.toString());
   JSONObject m=new JSONObject().put("id",id).put("peer",to).put("text",p.optString("text")).put("kind",p.optString("kind","text")).put("time",now).put("out",true).put("status","pending");
   if(local!=null)m.put("local",local);
-  for(String key:new String[]{"mime","size","name","sha256","sticker","reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","duration","waveform","transcript","transcript_language","silent","mini","mini_update","watch","custom_sticker","sticker_id","sticker_author"})if(p.has(key))m.put(key,p.get(key));
+  for(String key:new String[]{"mime","size","name","sha256","sticker","reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","blob_format","document","duration","waveform","transcript","transcript_language","silent","mini","mini_update","watch","custom_sticker","sticker_id","sticker_author"})if(p.has(key))m.put(key,p.get(key));
   JSONObject envelopes=new JSONObject();
   if(Conversation.community(to)){
    JSONObject r=room(Conversation.room(to));if(r==null)throw new Exception(I18n.t("Чат недоступен"));
@@ -140,12 +140,12 @@ final class Vault {
   JSONObject m=new JSONObject().put("id",envelope.getString("id")).put("peer",target).put("from",peer.getString("nick")).put("text",p.optString("text")).put("kind",k).put("time",envelope.getLong("time")).put("out",false).put("status","received");
   if(k.equals("file")){
    if(p.optBoolean("custom_sticker")&&(!p.optString("mime").equals("image/webp")||p.optLong("size")>350000||!p.optString("sticker_id").matches("[a-f0-9-]{36}")||!p.optString("sticker_author").equals(peer.getString("nick"))))throw new Exception(I18n.t("Неверный авторский стикер"));
-   if(!p.optString("mime").matches("image/(jpeg|png|webp)|video/(mp4|webm)|audio/(mp4|ogg|mpeg|wav|x-wav|flac|opus|x-flac)")||p.optLong("size")<1||p.optLong("size")>(p.optString("cloud_video").matches("[a-f0-9-]{36}")?2147483648L:MediaFiles.MAX)||!p.optString("sha256").matches("[a-fA-F0-9]{64}"))throw new Exception(I18n.t("Неподдерживаемое вложение"));
+   if(!(p.optBoolean("document")&&p.optString("mime").matches("[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+"))&&!p.optString("mime").matches("image/(jpeg|png|webp)|video/(mp4|webm)|audio/(mp4|ogg|mpeg|wav|x-wav|flac|opus|x-flac)")||p.optLong("size")<1||p.optLong("size")>(p.optString("cloud_video").matches("[a-f0-9-]{36}")?2147483648L:MediaFiles.MAX)||!p.optString("sha256").matches("[a-fA-F0-9]{64}"))throw new Exception(I18n.t("Неподдерживаемое вложение"));
    for(String key:new String[]{"mime","size","sha256"})m.put(key,p.get(key));m.put("name",p.optString("name",I18n.t("Медиа")).replaceAll("[\\r\\n/\\\\]","_").substring(0,Math.min(100,p.optString("name",I18n.t("Медиа")).length())));
   }
   if(k.equals("sticker")){int sticker=p.optInt("sticker");m.put("sticker",sticker>=100&&sticker<108?sticker:Math.max(0,Math.min(11,sticker)));}
   if(k.equals("control"))m.put("control",p);
-  for(String extra:new String[]{"reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","duration","waveform","transcript","transcript_language","silent","mini","mini_update","watch","custom_sticker","sticker_id","sticker_author"})if(p.has(extra))m.put(extra,p.get(extra));
+  for(String extra:new String[]{"reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","blob_format","document","duration","waveform","transcript","transcript_language","silent","mini","mini_update","watch","custom_sticker","sticker_id","sticker_author"})if(p.has(extra))m.put(extra,p.get(extra));
   if(m.has("transcript")&&(!(m.opt("transcript") instanceof String)||m.optString("transcript").length()>12000)){m.remove("transcript");m.remove("transcript_language");}
   data.getJSONArray("messages").put(m);EventExpiry.receivedReply(this,m);save();
  }
@@ -157,7 +157,7 @@ final class Vault {
   if(r==null||!r.optString("kind").equals("channel"))throw new Exception(I18n.t("Канал недоступен"));
   boolean subscribed=false;JSONArray members=r.getJSONArray("members");for(int i=0;i<members.length();i++)if(members.getString(i).equals(nick()))subscribed=true;if(!subscribed)throw new Exception(I18n.t("Сначала подпишитесь на канал"));
   if(isDeleted(mid,rid,p.optString("thread")))return;
-  if(has(mid)){JSONArray existing=data.getJSONArray("messages");String target=p.optString("thread").isEmpty()?"room:"+rid:"thread:"+rid+":"+p.optString("thread");for(int i=0;i<existing.length();i++){JSONObject m=existing.getJSONObject(i);if(!m.optString("id").equals(mid))continue;if(!m.optString("peer").equals(target)||!(m.optBoolean("out")?nick():m.optString("from")).equals(record.getString("from")))throw new Exception(I18n.t("Публикация из другого чата"));for(String key:new String[]{"cloud_blob","blob_key","blob_iv","cloud_video","thumb"})if(p.has(key))m.put(key,p.get(key));m.put("channel_saved",true);save();break;}return;}
+  if(has(mid)){JSONArray existing=data.getJSONArray("messages");String target=p.optString("thread").isEmpty()?"room:"+rid:"thread:"+rid+":"+p.optString("thread");for(int i=0;i<existing.length();i++){JSONObject m=existing.getJSONObject(i);if(!m.optString("id").equals(mid))continue;if(!m.optString("peer").equals(target)||!(m.optBoolean("out")?nick():m.optString("from")).equals(record.getString("from")))throw new Exception(I18n.t("Публикация из другого чата"));for(String key:new String[]{"cloud_blob","blob_key","blob_iv","blob_format","document","cloud_video","thumb"})if(p.has(key))m.put(key,p.get(key));m.put("channel_saved",true);save();break;}return;}
   JSONObject envelope=new JSONObject().put("id",mid).put("from",record.getString("from")).put("to",nick()).put("time",record.getLong("time")).put("room",rid);
   receiveDecoded(envelope,author,p,true);JSONArray messages=data.getJSONArray("messages");
   for(int i=0;i<messages.length();i++){JSONObject m=messages.getJSONObject(i);if(m.optString("id").equals(mid)){m.put("cloud",true).put("channel_saved",true);if(record.getString("from").equals(nick())){m.put("out",true).put("status","delivered");m.remove("from");}break;}}save();
