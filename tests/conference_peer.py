@@ -46,10 +46,19 @@ class ConferencePeer:
     while True:await track.recv();self.frames[peer][track.kind]+=1
    except Exception:pass
   return pc
+ async def incoming(self):
+  for pc in self.connections.values():await pc.close()
+  self.cid=str(uuid.uuid4());self.host=self.nick;self.roster={self.nick,'alice'};self.version=1;self.connections={};self.frames={};self.pending={};self.sent_end=False
+  await self.connect('alice');await self.signal('alice','vc_invite',host=self.nick,members=[self.nick,'alice'])
+  return {'cid':self.cid}
  async def receive(self,peer,p):
   op=p.get('op','')
   if op=='vc_invite' and peer=='alice':self.cid=p['cid'];self.host=peer;await self.signal(peer,'vc_join');return
   if p.get('cid')!=self.cid:return
+  if op=='vc_join' and self.host==self.nick and peer=='alice':await self.signal(peer,'vc_roster',members=[self.nick,'alice'],revision=self.version);return
+  if op=='vc_leave' and self.host==self.nick:
+   if peer in self.connections:await self.connections[peer].close()
+   return
   if op=='vc_end' and peer==self.host:
    self.sent_end=True
    for pc in self.connections.values():await pc.close()

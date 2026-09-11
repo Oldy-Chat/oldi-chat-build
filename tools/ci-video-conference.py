@@ -14,7 +14,7 @@ try:
  for permission in ('CAMERA','RECORD_AUDIO','POST_NOTIFICATIONS'):subprocess.run(['adb','shell','pm','grant','chat.oldy','android.permission.'+permission],check=True)
  result=subprocess.run(['adb','shell','am','instrument','-w','-e','pin',pin.read_text().strip(),'chat.oldy.tests/chat.oldy.VideoConferenceInstrumentation'],capture_output=True,text=True,timeout=240)
  (out/'conference.txt').write_text(result.stdout);print(result.stdout,flush=True)
- if 'OLDI_CONFERENCE_PASS' not in result.stdout:raise RuntimeError('Five-party video check failed')
+ conference_ok='OLDI_CONFERENCE_PASS' in result.stdout
  def boot_polls():
   connection=http.client.HTTPSConnection('127.0.0.1',8444,context=ssl.create_default_context(cafile=str(root/'build/device-server/server.crt')),timeout=5)
   try:
@@ -36,6 +36,7 @@ try:
  else:raise RuntimeError('No authenticated message polling after boot without opening an activity')
  proof='OLDI_BOOT_PASS: foreground message service and authenticated polling resumed after real reboot without opening the app\n'
  (out/'boot.txt').write_text(proof);print(proof,flush=True)
+ if not conference_ok:raise RuntimeError('Video check failed; reboot delivery was checked independently')
 
 finally:
  server.terminate()
