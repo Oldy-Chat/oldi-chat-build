@@ -127,9 +127,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: false
-          script: |
-            bash tools/ci-android-ui.sh
-            python3 tools/aeza/verify_android_route.py
+          script: bash tools/ci-android-checks.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
