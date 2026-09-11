@@ -34,5 +34,10 @@ def main():
 
 if __name__=='__main__':
  try:main()
+ except subprocess.CalledProcessError as error:
+  if isinstance(error.stdout,bytes):
+   for line in error.stdout.decode(errors="replace").splitlines():
+    if line.startswith("MEDIA_DEPLOY_FAILED:"):print(line[:200])
+  print("MEDIA_REMOTE_EXIT:",error.returncode);sys.exit(1)
  except Exception as error:
   print('MEDIA_DEPLOY_FAILED: '+(str(error) if isinstance(error,RuntimeError) else type(error).__name__));sys.exit(1)

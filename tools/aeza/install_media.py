@@ -14,7 +14,9 @@ import time
 HOST='2.56.174.123'
 FILES={'media_service.py','sticker_generation.py','sticker_collection.py'}
 
-def run(*args):return subprocess.run(args,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=300)
+def run(*args):
+ try:return subprocess.run(args,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=300)
+ except subprocess.CalledProcessError:raise RuntimeError('SETUP_COMMAND_FAILED: '+Path(args[0]).name) from None
 def main():
  if os.geteuid()!=0:raise RuntimeError('MEDIA_SETUP_REQUIRES_ROOT')
  addresses=subprocess.check_output(['hostname','-I'],text=True).split()
@@ -88,30 +90,10 @@ WantedBy=multi-user.target
    if health.get('service')=='oldi-media':break
   except Exception:time.sleep(.5)
  else:raise RuntimeError('MEDIA_HEALTH_FAILED')
- # One bounded live generation check. A successful result is reused on later deployments.
- diagnostic=data/'service-check.json';live={}
- if diagnostic.exists():
-  try:live=json.loads(diagnostic.read_text())
-  except Exception:pass
- if not live:
-  for line in provider.read_text().splitlines():
-   if '=' in line:
-    name,value=line.split('=',1)
-    if name.startswith('OLDY_STICKER_'):os.environ[name]=value
-  sys.path.insert(0,str(release));import sticker_generation as generation
-  began=time.monotonic()
-  try:
-   from PIL import Image
-   import io
-   rendered=generation.render_sheet(None,'wave','An original cheerful ginger cat in a blue hoodie, waving one front paw. No text.')
-   animation=generation.animation(rendered)
-   with Image.open(io.BytesIO(animation)) as image:
-    live={'success':True,'frames':image.n_frames,'width':image.width,'height':image.height,'bytes':len(animation),'seconds':round(time.monotonic()-began,1),'sha256':hashlib.sha256(animation).hexdigest()}
-   (data/'service-check.webp').write_bytes(animation)
-   diagnostic.write_text(json.dumps(live))
-  except generation.GenerationError as error:live={'success':False,'error':error.code,'seconds':round(time.monotonic()-began,1)}
-  except Exception:live={'success':False,'error':'GENERATION_CHECK_FAILED'}
-  diagnostic.write_text(json.dumps(live))
+ # Use the service virtual environment for the one bounded provider check.
+ check_code="import json,os,sys,time,hashlib\nfrom pathlib import Path\nrelease,data,provider=map(Path,sys.argv[1:])\ndiagnostic=data/'service-check.json';live={}\nif diagnostic.exists():\n try:live=json.loads(diagnostic.read_text())\n except Exception:pass\nif not live:\n for line in provider.read_text().splitlines():\n  if '=' in line:\n   name,value=line.split('=',1)\n   if name.startswith('OLDY_STICKER_'):os.environ[name]=value\n sys.path.insert(0,str(release));import sticker_generation as generation\n began=time.monotonic()\n try:\n  from PIL import Image\n  import io\n  rendered=generation.render_sheet(None,'wave','An original cheerful ginger cat in a blue hoodie, waving one front paw. No text.')\n  animation=generation.animation(rendered)\n  with Image.open(io.BytesIO(animation)) as image:\n   live={'success':True,'frames':image.n_frames,'width':image.width,'height':image.height,'bytes':len(animation),'seconds':round(time.monotonic()-began,1),'sha256':hashlib.sha256(animation).hexdigest()}\n  (data/'service-check.webp').write_bytes(animation)\n  diagnostic.write_text(json.dumps(live))\n except generation.GenerationError as error:live={'success':False,'error':error.code,'seconds':round(time.monotonic()-began,1)}\n except Exception:live={'success':False,'error':'GENERATION_CHECK_FAILED'}\n diagnostic.write_text(json.dumps(live))\nprint(json.dumps(live))\n"
+ checked=subprocess.run([str(env/'bin/python'),'-c',check_code,str(release),str(data),str(provider)],check=True,capture_output=True,text=True,timeout=240)
+ live=json.loads(checked.stdout.strip().splitlines()[-1])
  print(json.dumps({'service':'oldi-media','revision':revision,'certificate_sha256':hashlib.sha256(der).hexdigest(),'health':health,'provider_key_supplied':bool(api_key),'live_generation':live,'old_chat_changed':False}))
 
 if __name__=='__main__':

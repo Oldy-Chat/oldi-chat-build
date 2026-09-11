@@ -36,7 +36,7 @@ final class Api {
   }
  }
  JSONObject request(String base,String path,JSONObject body,String token)throws Exception{
-  HttpsURLConnection c=(HttpsURLConnection)new URL(base+path).openConnection();c.setSSLSocketFactory(factory());c.setConnectTimeout(18000);c.setReadTimeout(40000);c.setInstanceFollowRedirects(false);c.setRequestProperty("Accept","application/json");c.setRequestProperty("Connection","close");
+  HttpsURLConnection c=(HttpsURLConnection)new URL(base+path).openConnection(java.net.Proxy.NO_PROXY);c.setSSLSocketFactory(factory());c.setConnectTimeout(18000);c.setReadTimeout(40000);c.setInstanceFollowRedirects(false);c.setRequestProperty("Accept","application/json");c.setRequestProperty("Connection","close");
   if(!token.isEmpty())c.setRequestProperty("Authorization","Bearer "+token);
   if(path.equals("/poll"))polling=c;
   try{
@@ -47,7 +47,7 @@ final class Api {
   }finally{if(polling==c)polling=null;c.disconnect();}
  }
  JSONObject quickHealth()throws Exception{
-  String base=url().equals(DEFAULT_URL)&&!live.isEmpty()?live:url();HttpsURLConnection c=(HttpsURLConnection)new URL(base+"/health").openConnection();c.setSSLSocketFactory(factory());c.setConnectTimeout(2200);c.setReadTimeout(2200);c.setInstanceFollowRedirects(false);
+  String base=url().equals(DEFAULT_URL)&&!live.isEmpty()?live:url();HttpsURLConnection c=(HttpsURLConnection)new URL(base+"/health").openConnection(java.net.Proxy.NO_PROXY);c.setSSLSocketFactory(factory());c.setConnectTimeout(2200);c.setReadTimeout(2200);c.setInstanceFollowRedirects(false);
   try{if(c.getResponseCode()!=200)throw new IOException("Health check failed");JSONObject h=new JSONObject(read(c.getInputStream(),4096));if(!h.optString("service").equals("oldy-chat"))throw new IOException("Wrong service");return h;}finally{c.disconnect();}
  }
  JSONObject check()throws Exception{
