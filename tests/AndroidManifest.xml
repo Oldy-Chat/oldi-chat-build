@@ -17,4 +17,4 @@
  <instrumentation android:name="chat.oldy.YouTubeInstrumentation" android:targetPackage="chat.oldy"/>
  <instrumentation android:name="chat.oldy.LocalTunnelInstrumentation" android:targetPackage="chat.oldy"/>
  <instrumentation android:name="chat.oldy.UpgradeInstrumentation" android:targetPackage="chat.oldy"/>
-<instrumentation android:name="chat.oldy.SpeechInstrumentation" android:targetPackage="chat.oldy" /><instrumentation android:name="chat.oldy.LegalUiInstrumentation" android:targetPackage="chat.oldy" /></manifest>
+<instrumentation android:name="chat.oldy.SpeechInstrumentation" android:targetPackage="chat.oldy" /><instrumentation android:name="chat.oldy.LegalUiInstrumentation" android:targetPackage="chat.oldy" /><instrumentation android:name="chat.oldy.Release066Instrumentation" android:targetPackage="chat.oldy"/></manifest>

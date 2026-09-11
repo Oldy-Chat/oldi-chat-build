@@ -100,6 +100,13 @@ class MediaTest(unittest.TestCase):
      while not header.endswith(b'\r\n\r\n'):header+=c.recv(1)
      self.assertIn(b' 200 ',header);payload=b'\x16\x03\x03opaque-test-tls';c.sendall(payload);self.assertEqual(c.recv(64),payload)
   finally:thread.join(5);echo.close()
+ def test_preview_url_is_fixed_and_credentials_are_not_forwarded(self):
+  with patch.object(media.http.client,'HTTPSConnection') as constructor:
+   response=constructor.return_value.getresponse.return_value;response.status=200;response.read.return_value=b'{"title":"A video"}'
+   status,payload=self.request('/youtube/metadata/dQw4w9WgXcQ')
+   self.assertEqual((status,payload),(200,{'title':'A video'}));self.assertEqual(constructor.call_args.args[0],'www.youtube.com')
+   self.assertNotIn('Authorization',constructor.return_value.request.call_args.kwargs['headers'])
+  self.assertEqual(self.request('/youtube/metadata/../../etc/passwd')[0],404)
  def test_account_pin_is_checked_before_transmitting_the_token(self):
   with patch.object(media.http.client,'HTTPSConnection') as constructor:
    constructor.return_value.sock.getpeercert.return_value=b'wrong-certificate'

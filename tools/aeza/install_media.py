@@ -88,7 +88,31 @@ WantedBy=multi-user.target
    if health.get('service')=='oldi-media':break
   except Exception:time.sleep(.5)
  else:raise RuntimeError('MEDIA_HEALTH_FAILED')
- print(json.dumps({'service':'oldi-media','revision':revision,'certificate_sha256':hashlib.sha256(der).hexdigest(),'health':health,'provider_key_supplied':bool(api_key),'old_chat_changed':False}))
+ # One bounded live generation check. A successful result is reused on later deployments.
+ diagnostic=data/'service-check.json';live={}
+ if diagnostic.exists():
+  try:live=json.loads(diagnostic.read_text())
+  except Exception:pass
+ if not live:
+  for line in provider.read_text().splitlines():
+   if '=' in line:
+    name,value=line.split('=',1)
+    if name.startswith('OLDY_STICKER_'):os.environ[name]=value
+  sys.path.insert(0,str(release));import sticker_generation as generation
+  began=time.monotonic()
+  try:
+   from PIL import Image
+   import io
+   rendered=generation.render_sheet(None,'wave','An original cheerful ginger cat in a blue hoodie, waving one front paw. No text.')
+   animation=generation.animation(rendered)
+   with Image.open(io.BytesIO(animation)) as image:
+    live={'success':True,'frames':image.n_frames,'width':image.width,'height':image.height,'bytes':len(animation),'seconds':round(time.monotonic()-began,1),'sha256':hashlib.sha256(animation).hexdigest()}
+   (data/'service-check.webp').write_bytes(animation)
+   diagnostic.write_text(json.dumps(live))
+  except generation.GenerationError as error:live={'success':False,'error':error.code,'seconds':round(time.monotonic()-began,1)}
+  except Exception:live={'success':False,'error':'GENERATION_CHECK_FAILED'}
+  diagnostic.write_text(json.dumps(live))
+ print(json.dumps({'service':'oldi-media','revision':revision,'certificate_sha256':hashlib.sha256(der).hexdigest(),'health':health,'provider_key_supplied':bool(api_key),'live_generation':live,'old_chat_changed':False}))
 
 if __name__=='__main__':
  try:main()

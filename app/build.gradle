@@ -18,7 +18,7 @@ android {
  }
  buildFeatures { buildConfig true }
  buildTypes {
-  release { signingConfig (providers.gradleProperty("oldiUnsigned").isPresent() ? null : signingConfigs.beta); minifyEnabled false; buildConfigField 'boolean', 'DIRECT_UPDATES', 'true' }
+  release { signingConfig (providers.gradleProperty("oldiUiTest").isPresent() ? signingConfigs.debug : providers.gradleProperty("oldiUnsigned").isPresent() ? null : signingConfigs.beta); debuggable providers.gradleProperty("oldiUiTest").isPresent(); minifyEnabled false; buildConfigField 'boolean', 'DIRECT_UPDATES', 'true' }
   play { initWith release; buildConfigField 'boolean', 'DIRECT_UPDATES', 'false'; matchingFallbacks = ['release'] }
  }
  testBuildType 'release'

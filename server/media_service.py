@@ -1,6 +1,8 @@
 """Separate Aeza media service: authenticated YouTube CONNECT and owned stickers.
 Never imports the chat server or opens its database. Account validation is GET /me only.
 """
+import base64
+import urllib.parse
 import collections
 import hashlib
 import hmac
@@ -43,6 +45,23 @@ def addresses(host):
   result.append((family,kind,proto,address))
  if not result:raise Problem(502,'YOUTUBE_UNAVAILABLE')
  return result
+
+def youtube_preview(path):
+ match=re.fullmatch(r'/youtube/(metadata|thumbnail)/([A-Za-z0-9_-]{11})',path)
+ if not match:return None
+ kind,id=match.groups()
+ host='www.youtube.com' if kind=='metadata' else 'i.ytimg.com'
+ resource='/oembed?format=json&url='+urllib.parse.quote('https://www.youtube.com/watch?v='+id,safe='') if kind=='metadata' else '/vi/'+id+'/hqdefault.jpg'
+ connection=http.client.HTTPSConnection(host,443,timeout=10)
+ try:
+  connection.request('GET',resource,headers={'Accept':'application/json' if kind=='metadata' else 'image/jpeg'})
+  response=connection.getresponse()
+  if response.status!=200:raise Problem(502,'PREVIEW_UNAVAILABLE')
+  raw=response.read(350001)
+  if len(raw)>350000:raise Problem(502,'PREVIEW_TOO_LARGE')
+  if kind=='thumbnail':return {'image':base64.b64encode(raw).decode()}
+  value=json.loads(raw);return {'title':str(value.get('title',''))[:300]}
+ finally:connection.close()
 
 class AccountVerifier:
  def __init__(self):self.cache={};self.lock=threading.Lock()
@@ -131,7 +150,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
      data=json.loads(raw)
      if not isinstance(data,dict):raise ValueError()
     except Exception:raise Problem(400,'BODY_INVALID')
-   result=sticker_collection.api(self.server.state,self.path,post,data,owner)
+   result=youtube_preview(self.path) if not post else None
+   if result is None:result=sticker_collection.api(self.server.state,self.path,post,data,owner)
    if result is None:result=sticker_generation.api(self.server.state,self.path,post,data,owner)
    if result is None:raise Problem(404,'NOT_FOUND')
    self.json(200,result)
