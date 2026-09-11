@@ -48,3 +48,6 @@ secrets.json
 
 app/src/main/assets/speech-models.json
 tests/assets/speech/
+
+# Generated, checksum-verified offline speech models
+app/src/main/assets/speech/

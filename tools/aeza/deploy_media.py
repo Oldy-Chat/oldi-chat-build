@@ -20,7 +20,7 @@ def main():
  if not key or not known or not re.fullmatch('[a-z_][a-z0-9_-]{0,31}',user):raise RuntimeError('SSH_SETUP_REQUIRED')
  if len(known.split())!=3 or known.split()[:2]!=[HOST,'ssh-ed25519']:raise RuntimeError('HOST_KEY_REQUIRED')
  revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
- package={'revision':revision,'files':{name:(ROOT/'server'/name).read_text() for name in ('media_service.py','sticker_generation.py','sticker_collection.py')},'openai_key':os.environ.get('OLDY_STICKER_OPENAI_KEY','')}
+ package={'revision':revision,'files':{name:(ROOT/'server'/name).read_text() for name in ('media_service.py','sticker_generation.py','sticker_collection.py','assistant_text.py')},'openai_key':os.environ.get('OLDY_STICKER_OPENAI_KEY','')}
  env={k:v for k,v in os.environ.items() if not k.startswith(('AEZA_','OLDY_'))}
  with tempfile.TemporaryDirectory(prefix='oldi-media-deploy-') as folder:
   folder=Path(folder);identity=folder/'identity';identity.write_text(key+'\n');identity.chmod(0o600)
@@ -41,7 +41,7 @@ def main():
     public.connect()
     if not hmac.compare_digest(hashlib.sha256(public.sock.getpeercert(binary_form=True)).hexdigest(),report['certificate_sha256']):raise RuntimeError('EXTERNAL_MEDIA_CERTIFICATE_FAILED')
     public.request('GET','/health');response=public.getresponse();health=json.loads(response.read(4096))
-    if response.status!=200 or health.get('service')!='oldi-media':raise RuntimeError('EXTERNAL_MEDIA_HEALTH_FAILED')
+    if response.status!=200 or health.get('service')!='oldi-media' or health.get('code_sha256')!=hashlib.sha256(package['files']['media_service.py'].encode()).hexdigest():raise RuntimeError('EXTERNAL_MEDIA_HEALTH_FAILED')
     report['external_health_verified']=True
    finally:public.close()
    if report.get('live_generation',{}).get('success'):

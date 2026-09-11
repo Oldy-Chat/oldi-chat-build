@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'server/media_service.py'
+      - 'server/assistant_text.py'
       - 'server/sticker_collection.py'
       - 'server/sticker_generation.py'
       - 'tools/aeza/deploy_media.py'

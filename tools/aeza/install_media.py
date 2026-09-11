@@ -12,7 +12,7 @@ import sys
 import time
 
 HOST='2.56.174.123'
-FILES={'media_service.py','sticker_generation.py','sticker_collection.py'}
+FILES={'media_service.py','sticker_generation.py','sticker_collection.py','assistant_text.py'}
 
 def run(*args):
  try:return subprocess.run(args,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=300)
@@ -23,6 +23,7 @@ def main():
  if HOST not in addresses:raise RuntimeError('WRONG_VPS_ABORTED')
  package=json.load(sys.stdin);revision=package.get('revision','')
  if not re.fullmatch('[a-f0-9]{40}',revision) or set(package.get('files',{}))!=FILES:raise RuntimeError('INVALID_MEDIA_PACKAGE')
+ for name,source in package['files'].items():compile(source,name,'exec')
  root=Path('/opt/oldi-media');release=root/'releases'/revision;config=Path('/etc/oldi-media');data=Path('/var/lib/oldi-media')
  for path in (root,release,config,data):path.mkdir(parents=True,exist_ok=True)
  config.chmod(0o700)
@@ -41,7 +42,7 @@ def main():
  if not key.exists():
   run('openssl','req','-x509','-newkey','rsa:3072','-nodes','-days','3650','-keyout',str(key),'-out',str(cert),'-subj','/CN='+HOST,'-addext','subjectAltName=IP:'+HOST)
   key.chmod(0o600)
- provider=config/'provider.env';api_key=package.get('openai_key','').strip()
+ provider=config/'provider.env';previous_provider=provider.read_bytes() if provider.exists() else None;api_key=package.get('openai_key','').strip()
  if api_key:
   if any(c in api_key for c in '\r\n\x00') or len(api_key)>1024:raise RuntimeError('INVALID_PROVIDER_KEY')
   # Secret stays outside code, command arguments and logs.
@@ -76,6 +77,7 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 WantedBy=multi-user.target
 '''
  if unit.exists() and 'Oldi separate YouTube and sticker service' not in unit.read_text():raise RuntimeError('UNRELATED_SERVICE_EXISTS')
+ previous_unit=unit.read_text() if unit.exists() else None
  unit.write_text(content);run('systemctl','daemon-reload');run('systemctl','enable','oldi-media.service');run('systemctl','restart','oldi-media.service')
  # Only the new media port is added if UFW is already active; existing rules remain.
  if subprocess.run(['sh','-c','command -v ufw'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0:
@@ -87,9 +89,14 @@ WantedBy=multi-user.target
    import ssl,urllib.request
    context=ssl.create_default_context(cafile=str(cert))
    with urllib.request.urlopen('https://'+HOST+':9443/health',context=context,timeout=3) as response:health=json.load(response)
-   if health.get('service')=='oldi-media':break
+   if health.get('service')=='oldi-media' and health.get('code_sha256')==hashlib.sha256(package['files']['media_service.py'].encode()).hexdigest():break
   except Exception:time.sleep(.5)
- else:raise RuntimeError('MEDIA_HEALTH_FAILED')
+ else:
+  if previous_unit is not None:
+   unit.write_text(previous_unit)
+   if previous_provider is not None:provider.write_bytes(previous_provider);provider.chmod(0o600)
+   run('systemctl','daemon-reload');run('systemctl','restart','oldi-media.service')
+  raise RuntimeError('MEDIA_HEALTH_FAILED_PREVIOUS_RELEASE_RESTORED' if previous_unit is not None else 'MEDIA_HEALTH_FAILED')
  # Use the service virtual environment for the one bounded provider check.
  check_code="import json,os,sys,time,hashlib\nfrom pathlib import Path\nrelease,data,provider=map(Path,sys.argv[1:])\ndiagnostic=data/'service-check.json';live={}\nif diagnostic.exists():\n try:live=json.loads(diagnostic.read_text())\n except Exception:pass\nif not live:\n for line in provider.read_text().splitlines():\n  if '=' in line:\n   name,value=line.split('=',1)\n   if name.startswith('OLDY_STICKER_'):os.environ[name]=value\n sys.path.insert(0,str(release));import sticker_generation as generation\n began=time.monotonic()\n try:\n  from PIL import Image\n  import io\n  rendered=generation.render_sheet(None,'wave','An original cheerful ginger cat in a blue hoodie, waving one front paw. No text.')\n  animation=generation.animation(rendered)\n  with Image.open(io.BytesIO(animation)) as image:\n   live={'success':True,'frames':image.n_frames,'width':image.width,'height':image.height,'bytes':len(animation),'seconds':round(time.monotonic()-began,1),'sha256':hashlib.sha256(animation).hexdigest()}\n  (data/'service-check.webp').write_bytes(animation)\n  diagnostic.write_text(json.dumps(live))\n except generation.GenerationError as error:live={'success':False,'error':error.code,'seconds':round(time.monotonic()-began,1)}\n except Exception:live={'success':False,'error':'GENERATION_CHECK_FAILED'}\n diagnostic.write_text(json.dumps(live))\nprint(json.dumps(live))\n"
  checked=subprocess.run([str(env/'bin/python'),'-c',check_code,str(release),str(data),str(provider)],check=True,capture_output=True,text=True,timeout=240)

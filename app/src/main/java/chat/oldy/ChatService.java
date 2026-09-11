@@ -46,7 +46,7 @@ public class ChatService extends Service {
      if(!room.isEmpty())vault.putRoom(api.call("/room/"+room,null,vault.token()));
      if(payload.optString("kind").equals("signal")){
       if(!room.isEmpty()){JSONObject r=vault.room(room);boolean member=false;JSONArray members=r.getJSONArray("members");for(int j=0;j<members.length();j++)if(from.equals(members.optString(j)))member=true;if(!member)throw new java.security.GeneralSecurityException("Sender left room");}
-      if(payload.optString("op").startsWith("call_")){if(room.isEmpty()&&!vault.isBlocked(from))LiveCall.receive(this,from,payload);}else if(!vault.isBlocked(from)||!room.isEmpty())rtc.accept(from,payload);
+      if(payload.optString("op").startsWith("call_")){if(room.isEmpty()&&!vault.isBlocked(from))LiveCall.receive(this,from,payload);}else if(payload.optString("op").equals("youtube_watch")){if(room.isEmpty()&&!vault.isBlocked(from))YouTubeTogether.receive(this,from,payload);}else if(!vault.isBlocked(from)||!room.isEmpty())rtc.accept(from,payload);
      }else{
       boolean fresh=!vault.has(e.getString("id"));vault.receiveDecoded(e,peer,payload);JSONObject m=vault.message(e.getString("id"));
       if(running&&fresh&&m!=null&&!m.optString("kind").equals("control")&&!visibleChat.equals(m.optString("peer")))Notices.show(this,vault,m,peer);
@@ -59,7 +59,7 @@ public class ChatService extends Service {
   }catch(Exception e){checked=false;state=e instanceof Api.Failure&&((Api.Failure)e).status==401?"Нужно войти снова":"Нет подключения";changed(this);pause(3000);}finally{if(wake.isHeld())wake.release();}}
  }
  void sync()throws Exception{
-  try{api.call("/capabilities",new JSONObject().put("protocol",4),vault.token());long revision=vault.roomRevision();vault.syncRooms(api.call("/rooms",null,vault.token()).getJSONArray("rooms"),revision);vault.profile(api.call("/me",null,vault.token()));vault.blocks(api.call("/blocks",null,vault.token()).getJSONArray("blocked"));deletionSync();try{JSONArray cleared=api.call("/chats/cleared",null,vault.token()).getJSONArray("items");for(int i=0;i<cleared.length();i++){JSONObject c=cleared.getJSONObject(i);vault.clearChat(c.getString("peer"),c.getLong("through_ms"));}}catch(Api.Failure e){if(e.status!=404)throw e;}cloudSync();JSONObject rooms=vault.copy().getJSONObject("rooms");java.util.Iterator<String> roomIds=rooms.keys();while(roomIds.hasNext()){String rid=roomIds.next();try{ChannelHistory.syncRoom(api,vault,rid,4);}catch(Api.Failure e){if(e.status!=403&&e.status!=404)throw e;}}}catch(Api.Failure e){if(e.status!=404)throw e;}
+  try{api.call("/capabilities",new JSONObject().put("protocol",5),vault.token());long revision=vault.roomRevision();vault.syncRooms(api.call("/rooms",null,vault.token()).getJSONArray("rooms"),revision);vault.profile(api.call("/me",null,vault.token()));vault.blocks(api.call("/blocks",null,vault.token()).getJSONArray("blocked"));deletionSync();try{JSONArray cleared=api.call("/chats/cleared",null,vault.token()).getJSONArray("items");for(int i=0;i<cleared.length();i++){JSONObject c=cleared.getJSONObject(i);vault.clearChat(c.getString("peer"),c.getLong("through_ms"));}}catch(Api.Failure e){if(e.status!=404)throw e;}cloudSync();JSONObject rooms=vault.copy().getJSONObject("rooms");java.util.Iterator<String> roomIds=rooms.keys();while(roomIds.hasNext()){String rid=roomIds.next();try{ChannelHistory.syncRoom(api,vault,rid,4);}catch(Api.Failure e){if(e.status!=403&&e.status!=404)throw e;}}}catch(Api.Failure e){if(e.status!=404)throw e;}
  }
  void requestSync(){refreshRequested=true;if(api!=null)api.interruptPoll();}
  void send(){long lastSync=0;while(running){try{
@@ -73,6 +73,7 @@ public class ChatService extends Service {
      JSONObject peer=api.call("/user/"+target,null,vault.token());vault.pin(peer);JSONObject r=api.call("/send",envelopes.getJSONObject(target),vault.token());if(r.optBoolean("delivered")){vault.deliveredTo(m.getString("id"),target);changed(this);}else if(r.optBoolean("stored")){vault.storedTo(m.getString("id"),target);changed(this);}
     }catch(Exception ignored){}}
    }
+   EventExpiry.drain(this);
   }catch(Exception ignored){}pause(2500);}}
 
  void deletionSync()throws Exception{try{JSONArray events=api.call("/deletions?after="+vault.deletionCursor(),null,vault.token()).getJSONArray("items");for(int i=0;i<events.length();i++)vault.deletion(events.getJSONObject(i));}catch(Api.Failure e){if(e.status!=404)throw e;}}

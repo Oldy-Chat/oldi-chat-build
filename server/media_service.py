@@ -22,6 +22,11 @@ import time
 from types import SimpleNamespace
 import sticker_generation
 import sticker_collection
+import assistant_text
+
+# A public health response identifies the actual loaded source, not just a live port.
+try: SOURCE_SHA256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+except (NameError,OSError): SOURCE_SHA256=''
 
 ROOTS=('youtube.com','youtube-nocookie.com','youtu.be','googlevideo.com','ytimg.com',
        'youtubei.googleapis.com','youtube.googleapis.com','ggpht.com','accounts.google.com',
@@ -134,9 +139,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
   return self.server.verify(header[7:])
  def do_GET(self):self.api(False)
  def do_POST(self):self.api(True)
+ def body(self,length):
+  # CONNECT must remain unbuffered, but SocketIO.read(n) may return only one
+  # TLS record/network packet. Accumulate the bounded POST body explicitly.
+  chunks=[];remaining=length;deadline=time.monotonic()+30
+  while remaining:
+   timeout=deadline-time.monotonic()
+   if timeout<=0:raise Problem(408,'BODY_TIMEOUT')
+   self.connection.settimeout(timeout)
+   chunk=self.rfile.read(min(65536,remaining))
+   if not chunk:raise Problem(400,'BODY_INVALID')
+   chunks.append(chunk);remaining-=len(chunk)
+  return b''.join(chunks)
  def api(self,post):
   try:
-   if self.path=='/health' and not post:return self.json(200,{'service':'oldi-media','version':1,'youtube_proxy':True})
+   if self.path=='/health' and not post:return self.json(200,{'service':'oldi-media','version':1,'youtube_proxy':True,'code_sha256':SOURCE_SHA256})
    owner=self.account();self.server.state.rate(('media-api',owner),180,60)
    if self.headers.get('Transfer-Encoding'):raise Problem(400,'BODY_INVALID')
    try:length=int(self.headers.get('Content-Length','0'))
@@ -145,7 +162,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
    data={}
    if post:
     try:
-     raw=self.rfile.read(length)
+     raw=self.body(length)
      if len(raw)!=length:raise ValueError()
      data=json.loads(raw)
      if not isinstance(data,dict):raise ValueError()
@@ -153,6 +170,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
    result=youtube_preview(self.path) if not post else None
    if result is None:result=sticker_collection.api(self.server.state,self.path,post,data,owner)
    if result is None:result=sticker_generation.api(self.server.state,self.path,post,data,owner)
+   if result is None:result=assistant_text.api(self.server.state,self.path,post,data,owner)
    if result is None:raise Problem(404,'NOT_FOUND')
    self.json(200,result)
   except Problem as error:self.json(error.status,{'error':error.code})

@@ -1,0 +1,34 @@
+package chat.oldy;
+
+import android.content.Intent;
+import android.os.SystemClock;
+import android.widget.*;
+import org.json.*;
+import java.util.*;
+
+/** Synchronizes the official player only after both people open the invitation. */
+final class YouTubeTogether {
+ static volatile Session current;
+ static boolean valid(JSONObject w){return w!=null&&w.optString("id").matches("[a-f0-9-]{36}")&&w.optString("video").matches("[A-Za-z0-9_-]{11}");}
+ static JSONObject invitation(String video)throws Exception{return new JSONObject().put("kind","text").put("text","Смотреть вместе · https://www.youtube.com/watch?v="+video).put("watch",new JSONObject().put("id",UUID.randomUUID().toString()).put("video",video));}
+ static void invite(MainActivity a,String url){YouTubeLinkDetector.Target target=YouTubeLinkDetector.parse(url);if(target==null||target.videoId.isEmpty())return;try{JSONObject message=invitation(target.videoId);if(a.screen.equals("chat")&&!Conversation.community(a.chat)){send(a,a.chat,message);return;}LinearLayout b=a.col();JSONObject contacts=a.vault.copy().getJSONObject("contacts");Iterator<String> names=contacts.keys();int count=0;while(names.hasNext()){String peer=names.next();if(peer.equals(a.vault.nick())||a.vault.isBlocked(peer))continue;count++;b.addView(a.button(contacts.getJSONObject(peer).optString("name",peer)+" · @"+peer,false,()->send(a,peer,message)));a.space(b,6);}if(count==0)a.paragraph(b,"Добавьте собеседника в контакты.");a.sheet("Смотреть вместе",b);}catch(Exception e){a.error(Api.message(e));}}
+ static void send(MainActivity a,String peer,JSONObject payload){ChatSharing.send(a,peer,payload,()->open(a,peer,payload.optJSONObject("watch"),true));}
+ static void render(MainActivity a,LinearLayout box,JSONObject m){JSONObject w=m.optJSONObject("watch");if(!valid(w)||Conversation.community(m.optString("peer")))return;box.addView(a.button("▶ Смотреть вместе",true,()->open(a,m.optString("peer"),w,m.optBoolean("out"))));}
+ static void open(MainActivity a,String peer,JSONObject w,boolean host){if(!valid(w)||Conversation.community(peer))return;a.startActivity(new Intent(a,YouTubeHubActivity.class).putExtra("url","https://m.youtube.com/watch?v="+w.optString("video")).putExtra("watch_id",w.optString("id")).putExtra("watch_peer",peer).putExtra("watch_video",w.optString("video")).putExtra("watch_account",a.vault.nick()).putExtra("watch_host",host));}
+ static Session join(YouTubeHubActivity a){try{Intent i=a.getIntent();Vault owner=ChatService.vault(a);String peer=i.getStringExtra("watch_peer");JSONObject w=new JSONObject().put("id",i.getStringExtra("watch_id")).put("video",i.getStringExtra("watch_video"));if(!valid(w)||peer==null||!peer.matches("[a-z0-9_]{3,24}")||owner.isBlocked(peer)||!owner.nick().equals(i.getStringExtra("watch_account")))return null;if(current!=null)current.close();Session s=new Session(a,owner,peer,w,i.getBooleanExtra("watch_host",false));current=s;return s;}catch(Exception e){return null;}}
+ static void receive(ChatService service,String from,JSONObject payload){Session s=current;if(s==null||s.owner!=service.vault||!s.accepts(from,payload))return;s.activity.ui.post(()->{if(current==s&&!s.activity.isDestroyed())s.receive(payload);});}
+ static final class Session {
+  final YouTubeHubActivity activity;final Vault owner;final String peer,id,video;final boolean host;final long started=SystemClock.elapsedRealtime();
+  long lastReceived,lastRequest,lastSequence,sequence=System.currentTimeMillis();JSONObject desired;boolean ended,remoteReady;String note="Ожидаем собеседника";
+  Session(YouTubeHubActivity a,Vault v,String p,JSONObject w,boolean h){activity=a;owner=v;peer=p;id=w.optString("id");video=w.optString("video");host=h;}
+  boolean accepts(String from,JSONObject p){return !ended&&SystemClock.elapsedRealtime()-started<7200000&&peer.equals(from)&&id.equals(p.optString("sid"))&&video.equals(p.optString("video"))&&p.optString("room").isEmpty()&&p.optString("op").equals("youtube_watch");}
+  void send(String action,JSONObject value){ChatService service=ChatService.instance;if(service==null||service.vault!=owner)return;try{JSONObject p=value==null?new JSONObject():new JSONObject(value.toString());p.put("op","youtube_watch").put("action",action).put("sid",id).put("video",video).put("seq",++sequence);service.signal(peer,p);}catch(Exception ignored){}}
+  void receive(JSONObject p){long seq=p.optLong("seq");if(seq<=lastSequence)return;lastSequence=seq;String action=p.optString("action");if(action.equals("end")){ended=true;desired=null;note="Совместный просмотр завершён";activity.connectionLabel();return;}if(host&&action.equals("ready")){remoteReady=true;lastReceived=SystemClock.elapsedRealtime();note="Смотрим вместе · вы управляете";return;}if(!host&&action.equals("state")){double position=p.optDouble("position",Double.NaN);if(!Double.isFinite(position)||position<0||position>86400||!(p.opt("playing") instanceof Boolean))return;desired=p;lastReceived=SystemClock.elapsedRealtime();note="Смотрим вместе · управляет @"+peer;apply();}}
+  void tick(){if(ended)return;if(SystemClock.elapsedRealtime()-started>7200000){close();return;}if(ChatService.shared!=owner){close();return;}if(!host&&SystemClock.elapsedRealtime()-lastRequest>8000){lastRequest=SystemClock.elapsedRealtime();send("ready",null);}if(lastReceived>0&&SystemClock.elapsedRealtime()-lastReceived>18000)note="Ожидаем соединение собеседника";if(!host)apply();activity.connectionLabel();}
+  boolean hasPartner(){return remoteReady&&SystemClock.elapsedRealtime()-lastReceived<15000;}
+  void state(JSONObject playback){if(ended||!host||!hasPartner()||!activity.foreground)return;YouTubeLinkDetector.Target target=YouTubeLinkDetector.parse(playback.optString("url"));if(target==null||!video.equals(target.videoId)||playback.optBoolean("ad"))return;try{double time=playback.optDouble("time");if(Double.isFinite(time)&&time>=0&&time<=86400)send("state",new JSONObject().put("position",time).put("playing",playback.optBoolean("playing")));}catch(Exception ignored){}}
+  void apply(){if(ended||host||desired==null||!activity.foreground||activity.web==null||!activity.loaded||SystemClock.elapsedRealtime()-lastReceived>8000)return;double position=desired.optDouble("position",0);boolean play=desired.optBoolean("playing");String js="(()=>{if(new URL(location.href).searchParams.get('v')!=="+JSONObject.quote(video)+"||document.querySelector('.ad-showing'))return;const v=document.querySelector('video');if(!v||v.readyState<2)return;if(Math.abs(v.currentTime-"+Double.toString(position)+")>3)v.currentTime="+Double.toString(position)+";"+(play?"v.play().catch(()=>{});":"v.pause();")+"})()";activity.web.evaluateJavascript(js,null);}
+  void pause(){if(host&&!ended)try{send("state",new JSONObject().put("position",activity.observedPosition).put("playing",false));}catch(Exception ignored){}}
+  void close(){if(!ended)send("end",null);ended=true;desired=null;if(current==this)current=null;}
+ }
+}

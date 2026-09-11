@@ -58,6 +58,8 @@ def remove_account(s,nick,journal=True):
   s.DB.execute('INSERT OR IGNORE INTO media_garbage VALUES(?)',(vid,));s.DB.execute('DELETE FROM video_variants WHERE id=?',(vid,));s.DB.execute('DELETE FROM videos WHERE id=?',(vid,))
  for (email,) in s.DB.execute('SELECT email FROM emails WHERE nick=? UNION SELECT email FROM pending_emails WHERE nick=?',(nick,nick)).fetchall():
   s.DB.execute('DELETE FROM signup_codes WHERE email=?',(email,));s.DB.execute('DELETE FROM login_codes WHERE email=?',(email,));s.DB.execute('DELETE FROM deletion_codes WHERE email=?',(email,))
+ if s.DB.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_devices'").fetchone():s.DB.execute('DELETE FROM session_devices WHERE session_hash IN (SELECT hash FROM sessions WHERE nick=?)',(nick,))
+ if s.DB.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='temporary_status'").fetchone():s.DB.execute('DELETE FROM temporary_status WHERE nick=?',(nick,))
  for table in ('sessions','profiles','members','key_backups','capabilities','room_bans','emails','email_codes','login_codes','pending_emails','email_login_accounts','contact_discovery','agreements','publishing_restrictions','deletion_codes'):
   s.DB.execute('DELETE FROM '+table+' WHERE nick=?',(nick,))
  for table in ('blocks',):s.DB.execute('DELETE FROM '+table+' WHERE owner=? OR target=?',(nick,nick))
