@@ -8,7 +8,19 @@ public class MediaRouteInstrumentation extends Release066Instrumentation {
  String credential;
  public void onCreate(Bundle args){credential=args.getString("token","");start();}
  String js(WebView web,String expression)throws Exception{CountDownLatch done=new CountDownLatch(1);String[] value={""};runOnMainSync(()->web.evaluateJavascript(expression,r->{value[0]=r;done.countDown();}));check(done.await(8,TimeUnit.SECONDS),"WebView script timed out");return value[0];}
- void awaitSticker(StickerEditorActivity editor)throws Exception{long until=SystemClock.elapsedRealtime()+270000;while(SystemClock.elapsedRealtime()<until){if(editor.animation!=null)return;if(!editor.busy){String[] message={""};runOnMainSync(()->message[0]=editor.status.getText().toString());throw new AssertionError("Sticker editor stopped: "+message[0]);}Thread.sleep(250);}throw new AssertionError("Sticker generation deadline");}
+ void awaitSticker(StickerEditorActivity editor)throws Exception{
+  long until=SystemClock.elapsedRealtime()+270000;
+  while(SystemClock.elapsedRealtime()<until){
+   boolean[] state=new boolean[2];String[] message={""};
+   // Photo import clears busy, installs the bitmap and starts generation in one UI callback.
+   // Read a single completed UI state, never the transient busy=false between those operations.
+   runOnMainSync(()->{state[0]=editor.animation!=null;state[1]=editor.busy;message[0]=editor.status.getText().toString();});
+   if(state[0])return;
+   if(!state[1])throw new AssertionError("Sticker editor stopped: "+message[0]);
+   Thread.sleep(250);
+  }
+  throw new AssertionError("Sticker generation deadline");
+ }
  public void onStart(){Bundle result=new Bundle();YouTubeHubActivity hub=null;try{
   Context c=getTargetContext();I18n.init(c);new Api(c).configure("https://127.0.0.1:9",new String(new char[64]).replace('\0','0'));
   Vault vault=ChatService.vault(c);JSONObject identity=vault.identity();vault.account(new JSONObject().put("token",credential).put("user",new JSONObject().put("nick","alice").put("name","CI Alice").put("enc",identity.getString("enc")).put("sig",identity.getString("sig")).put("accepted_policy","fixture")));
