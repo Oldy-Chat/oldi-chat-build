@@ -8,8 +8,8 @@ android {
   testApplicationId 'chat.oldy.tests'
   minSdk 26
   targetSdk 36
-  versionCode 14
-  versionName '0.6.5-beta'
+  versionCode 15
+  versionName '0.6.6-beta'
   testInstrumentationRunner 'chat.oldy.CryptoInstrumentation'
   ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }
  }
@@ -18,7 +18,7 @@ android {
  }
  buildFeatures { buildConfig true }
  buildTypes {
-  release { signingConfig signingConfigs.beta; minifyEnabled false; buildConfigField 'boolean', 'DIRECT_UPDATES', 'true' }
+  release { signingConfig (providers.gradleProperty("oldiUnsigned").isPresent() ? null : signingConfigs.beta); minifyEnabled false; buildConfigField 'boolean', 'DIRECT_UPDATES', 'true' }
   play { initWith release; buildConfigField 'boolean', 'DIRECT_UPDATES', 'false'; matchingFallbacks = ['release'] }
  }
  testBuildType 'release'

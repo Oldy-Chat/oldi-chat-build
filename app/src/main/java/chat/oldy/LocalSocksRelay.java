@@ -24,12 +24,11 @@ final class LocalSocksRelay implements Closeable {
   if(command==3){udp(local,in,out);return;}if(command!=1){reply(out,7,0);return;}
   if(target.ip.getHostAddress().equals(TrafficClassifier.DNS)&&target.port==53){reply(out,0,0);while(!closed){int n=in.readUnsignedShort();if(n<17||n>4096)return;byte[] q=new byte[n];in.readFully(q);byte[] a=LocalDns.answer(q,classifier,NetworkDiagnostics.physical(service));out.writeShort(a.length);out.write(a);out.flush();}return;}
   String host=classifier.host(target.ip);if(host==null||target.port!=443){reply(out,2,0);return;}
-  LocalSocket remote=null;try{remote=connect(host);resources.add(remote);reply(out,0,0);LocalSocket connected=remote;local.setSoTimeout(120000);pool.execute(()->{try{copy(connected.getInputStream(),local.getOutputStream());}catch(Exception ignored){}finally{discard(local);discard(connected);}});copy(in,connected.getOutputStream());}finally{if(remote!=null)discard(remote);}
+  MediaService.Pipe remote=null;try{remote=connect(host);resources.add(remote);reply(out,0,0);MediaService.Pipe connected=remote;local.setSoTimeout(120000);pool.execute(()->{try{copy(connected.getInputStream(),local.getOutputStream());}catch(Exception ignored){}finally{discard(local);discard(connected);}});copy(in,connected.getOutputStream());}finally{if(remote!=null)discard(remote);}
  }
- LocalSocket connect(String host)throws Exception{
-  Network network=NetworkDiagnostics.physical(service);if(network==null)throw new IOException("NO_NETWORK");Exception failure=new IOException("DPI_DNS");
-  for(InetAddress address:DirectDns.resolve(network,host)){if(!TrafficClassifier.publicAddress(address))continue;try{return dpi.connect(address);}catch(Exception e){failure=e;}}
-  TunnelStateRepository.error="DPI_TCP_"+failure.getClass().getSimpleName();throw failure;
+ MediaService.Pipe connect(String host)throws Exception{
+  Network network=NetworkDiagnostics.physical(service);if(network==null)throw new IOException("NO_NETWORK");
+  return MediaService.connect(service,network,host);
  }
 
  static void copy(InputStream in,OutputStream out)throws IOException{byte[] b=new byte[32768];int n;while((n=in.read(b))!=-1)out.write(b,0,n);}
@@ -44,12 +43,8 @@ final class LocalSocksRelay implements Closeable {
    InetSocketAddress from=(InetSocketAddress)packet.getSocketAddress();if(sender[0]==null)sender[0]=from;else if(!sender[0].equals(from))continue;
    DataInputStream data=new DataInputStream(new ByteArrayInputStream(buffer,0,packet.getLength()));if(data.readUnsignedShort()!=0||data.readUnsignedByte()!=0)continue;Address target=readAddress(data);byte[] raw=new byte[data.available()];data.readFully(raw);
    if(target.ip.getHostAddress().equals(TrafficClassifier.DNS)&&target.port==53){try{byte[] answer=LocalDns.answer(raw,classifier,NetworkDiagnostics.physical(service));byte[] framed=udpPacket(target,answer,answer.length);local.send(new DatagramPacket(framed,framed.length,from));}catch(Exception ignored){}continue;}
-   String host=classifier.host(target.ip);if(host==null||target.port!=443)continue;if(dpi!=null)continue;String key=target.ip.getHostAddress();DatagramSocket remote=flows.get(key);
-   if(remote==null){if(flows.size()>=24)continue;Network physical=NetworkDiagnostics.physical(service);if(physical==null)continue;InetAddress real=null;for(InetAddress ip:physical.getAllByName(host))if(TrafficClassifier.publicAddress(ip)){real=ip;break;}if(real==null)continue;
-    remote=new DatagramSocket(null);try{if(!service.protect(remote))throw new IOException();physical.bindSocket(remote);remote.bind(new InetSocketAddress(0));remote.connect(real,443);remote.setSoTimeout(30000);}catch(Exception failure){remote.close();continue;}resources.add(remote);flows.put(key,remote);DatagramSocket outbound=remote;
-    pool.execute(()->{try{byte[] incoming=new byte[65535];while(!closed&&!control.isClosed()){DatagramPacket response=new DatagramPacket(incoming,incoming.length);outbound.receive(response);byte[] framed=udpPacket(target,response.getData(),response.getLength());local.send(new DatagramPacket(framed,framed.length,from));}}catch(Exception ignored){}finally{flows.remove(key,outbound);discard(outbound);}});
-   }
-   try{remote.send(new DatagramPacket(raw,raw.length));}catch(Exception failure){flows.remove(key,remote);discard(remote);}
+   // QUIC/UDP is not sent directly: YouTube falls back to the authenticated TLS tunnel.
+   continue;
   }}catch(Exception ignored){}finally{discard(control);discard(local);for(DatagramSocket socket:flows.values())discard(socket);}});
   control.setSoTimeout(0);try{while(in.read()!=-1&&!closed){}}finally{discard(local);for(DatagramSocket socket:flows.values())discard(socket);}
  }

@@ -21,6 +21,7 @@ final class UiIcon extends View {
    case "back":c.drawLine(20,12,4,12,paint);p.moveTo(11,5);p.lineTo(4,12);p.lineTo(11,19);c.drawPath(p,paint);break;
    case "reply":p.moveTo(10,5);p.lineTo(3,11);p.lineTo(10,17);c.drawPath(p,paint);p.reset();p.moveTo(4,11);p.lineTo(13,11);p.quadTo(21,11,21,20);c.drawPath(p,paint);break;
    case "copy":c.drawRoundRect(7,6,21,22,2,2,paint);p.moveTo(16,3);p.lineTo(3,3);p.lineTo(3,17);c.drawPath(p,paint);break;
+   case "menu":for(int i=0;i<3;i++)c.drawLine(3,5+i*7,21,5+i*7,paint);break;
    case "more":paint.setStyle(Paint.Style.FILL);for(int i=0;i<3;i++)c.drawCircle(5+i*7,12,1.6f,paint);break;
    case "delete":c.drawLine(3,6,21,6,paint);p.moveTo(8,5);p.lineTo(8,2);p.lineTo(16,2);p.lineTo(16,5);c.drawPath(p,paint);p.reset();p.moveTo(5,7);p.lineTo(7,22);p.lineTo(17,22);p.lineTo(19,7);c.drawPath(p,paint);c.drawLine(10,10,10,18,paint);c.drawLine(14,10,14,18,paint);break;
    case "close":c.drawLine(6,6,18,18,paint);c.drawLine(18,6,6,18,paint);break;

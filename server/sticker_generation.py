@@ -76,12 +76,14 @@ def provider_error(error):
  if code in ('content_policy_violation','moderation_blocked'):return 'PROVIDER_REJECTED'
  return {400:'PROVIDER_REJECTED',401:'PROVIDER_CREDENTIALS',403:'PROVIDER_ACCESS',429:'PROVIDER_LIMIT'}.get(error.code,'PROVIDER_UNAVAILABLE')
 
-def render_sheet(photo,action):
+def render_sheet(photo,action,description=''):
  key,model,_=configuration()
  prompt=(
-  'Create an original 2D cartoon character animation SPRITE SHEET from the reference photo. '
-  'Redraw the person fully as a charming hand-drawn cartoon while preserving recognizable facial features, '
-  'hair, body proportions, clothing and natural color palette. No photographic textures, no color-filtered photograph. '
+  'Create an original 2D cartoon character animation SPRITE SHEET. '
+  'For a reference photo redraw its person OR animal as a charming hand-drawn cartoon, preserving '
+  'recognizable facial features, hair or fur, species, markings, clothing and natural colors. '
+  'Keep animals recognizable as animals; use paws and species-appropriate anatomy for the action. '
+  'No photographic textures, no color-filtered photograph. '
   'Exactly SIX chronological animation frames in a strict 3-column by 2-row grid on a 1536x1024 transparent canvas. '
   'Every cell is exactly 512x512. Each cell contains the SAME complete centered upper-body character, '
   'same head size, baseline and camera. Keep all hands and the character inside the central 440x440 area of each cell. '
@@ -89,7 +91,8 @@ def render_sheet(photo,action):
   'Across the six frames the character '+ACTIONS[action]+'. '
   'The ACTION must be redrawn as different joint/hand/face poses; do NOT rotate, bounce, translate or scale '
   'a single image as the animation. Frame 6 returns close to frame 1 for a loop. '
-  'Use expressive but anatomically coherent poses, consistent identity and clean sticker linework.'
+  'Use expressive but anatomically coherent poses, consistent identity and clean sticker linework. '
+  + ('Character description (subject only, keep the required transparent six-frame layout): '+description if description else '')
  )
  boundary='OldiSticker'+secrets.token_hex(16);parts=[]
  fields={'model':model,'prompt':prompt,'n':'1','size':'1536x1024','quality':'low','background':'transparent','output_format':'png'}
@@ -98,8 +101,13 @@ def render_sheet(photo,action):
  if model in ('gpt-image-1','gpt-image-1.5'):fields['input_fidelity']='high'
  for name,value in fields.items():
   parts.append(('--'+boundary+'\r\nContent-Disposition: form-data; name="'+name+'"\r\n\r\n'+value+'\r\n').encode())
- parts.extend([('--'+boundary+'\r\nContent-Disposition: form-data; name="image[]"; filename="reference.jpg"\r\nContent-Type: image/jpeg\r\n\r\n').encode(),photo,b'\r\n',('--'+boundary+'--\r\n').encode()])
- request=urllib.request.Request('https://api.openai.com/v1/images/edits',data=b''.join(parts),headers={'Authorization':'Bearer '+key,'Content-Type':'multipart/form-data; boundary='+boundary,'Accept':'application/json'},method='POST')
+ if photo is not None:
+  parts.extend([('--'+boundary+'\r\nContent-Disposition: form-data; name="image[]"; filename="reference.jpg"\r\nContent-Type: image/jpeg\r\n\r\n').encode(),photo,b'\r\n',('--'+boundary+'--\r\n').encode()])
+  endpoint='edits';body=b''.join(parts);content_type='multipart/form-data; boundary='+boundary
+ else:
+  endpoint='generations';fields.pop('input_fidelity',None);fields['n']=1
+  body=json.dumps(fields).encode();content_type='application/json'
+ request=urllib.request.Request('https://api.openai.com/v1/images/'+endpoint,data=body,headers={'Authorization':'Bearer '+key,'Content-Type':content_type,'Accept':'application/json'},method='POST')
  try:
   # No redirect, retry or arbitrary provider URL: avoid key leaks and duplicate charges.
   with urllib.request.build_opener(NoRedirect()).open(request,timeout=240) as response:
@@ -148,14 +156,16 @@ def public(s,nick,jid):
   result.update(image=base64.b64encode(raw).decode(),sha256=hashlib.sha256(raw).hexdigest())
  return result
 
-def run(s,nick,jid,photo,action):
+def run(s,nick,jid,photo,action,description=''):
  try:
   with s.LOCK:s.DB.execute("UPDATE sticker_jobs SET stage='drawing' WHERE id=? AND owner=?",(jid,nick));s.DB.commit()
-  sheet=render_sheet(photo,action)
+  sheet=render_sheet(photo,action,description) if description else render_sheet(photo,action)
   with s.LOCK:s.DB.execute("UPDATE sticker_jobs SET stage='encoding' WHERE id=? AND owner=?",(jid,nick));s.DB.commit()
   raw=animation(sheet);nonce=secrets.token_bytes(12)
   encrypted=nonce+AESGCM(s.CHANNEL_KEY).encrypt(nonce,raw,('oldi-generated-sticker:'+nick+':'+jid).encode())
-  with s.LOCK:s.DB.execute("UPDATE sticker_jobs SET state='ready',output=? WHERE id=? AND owner=? AND state='generating'",(encrypted,jid,nick));s.DB.commit()
+  with s.LOCK:
+   if hasattr(s,'claim_sticker'):s.claim_sticker(nick,jid,hashlib.sha256(raw).hexdigest())
+   s.DB.execute("UPDATE sticker_jobs SET state='ready',output=? WHERE id=? AND owner=? AND state='generating'",(encrypted,jid,nick));s.DB.commit()
  except Exception as error:
   code=error.code if isinstance(error,GenerationError) else 'GENERATION_FAILED'
   try:
@@ -172,14 +182,18 @@ def api(s,path,post,data,nick):
   if not re.fullmatch('[a-f0-9-]{36}',jid):raise s.Problem(400,'STICKER_JOB_INVALID')
   s.rate(('sticker-poll',nick),120,60);return public(s,nick,jid)
  if path=='/stickers/generate' and post:
-  if set(data)-{'id','image','action','consent_version'} or data.get('consent_version')!=1 or type(data.get('consent_version')) is not int:raise s.Problem(400,'STICKER_CONSENT_REQUIRED')
+  if set(data)-{'id','image','description','action','consent_version'} or data.get('consent_version')!=1 or type(data.get('consent_version')) is not int:raise s.Problem(400,'STICKER_CONSENT_REQUIRED')
   jid=data.get('id');action=data.get('action')
   if not isinstance(jid,str) or not re.fullmatch('[a-f0-9-]{36}',jid) or action not in ACTIONS:raise s.Problem(400,'STICKER_JOB_INVALID')
   if not enabled(nick):raise s.Problem(503,'STICKER_GENERATOR_NOT_CONFIGURED')
   s.rate(('sticker-create',nick),6,60)
-  try:photo=sanitized_image(data.get('image'))
+  description=data.get('description','')
+  if not isinstance(description,str) or len(description)>600 or any(ord(c)<32 and c not in '\n\t' for c in description):raise s.Problem(400,'STICKER_DESCRIPTION_INVALID')
+  description=description.strip()
+  if ('image' in data)==bool(description):raise s.Problem(400,'STICKER_INPUT_INVALID')
+  try:photo=sanitized_image(data.get('image')) if not description else None
   except GenerationError as e:raise s.Problem(400,e.code)
-  digest=hashlib.sha256(action.encode()+photo).hexdigest();now=int(time.time())
+  digest=hashlib.sha256(action.encode()+b'\0'+(photo if photo is not None else description.encode())).hexdigest();now=int(time.time())
   with s.LOCK:
    previous=s.DB.execute('SELECT owner,digest FROM sticker_jobs WHERE id=?',(jid,)).fetchone()
    if previous:
@@ -188,7 +202,7 @@ def api(s,path,post,data,nick):
    if not GATE.acquire(blocking=False):raise s.Problem(429,'STICKER_QUEUE_FULL')
    try:
     s.DB.execute("INSERT INTO sticker_jobs(id,owner,digest,state,created,expires) VALUES(?,?,?,'generating',?,?)",(jid,nick,digest,now,now+3600));s.DB.commit()
-    WORK.submit(run,s,nick,jid,photo,action)
+    WORK.submit(run,s,nick,jid,photo,action,description)
    except Exception:GATE.release();raise
   return {'id':jid,'state':'generating'}
  raise s.Problem(404,'STICKER_ENDPOINT_NOT_FOUND')

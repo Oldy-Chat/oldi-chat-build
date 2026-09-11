@@ -50,7 +50,7 @@ jobs:
   android:
     needs: source-policy
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,3 +80,28 @@ jobs:
           path: app/build/reports/lint-results-release.*
           if-no-files-found: warn
           retention-days: 14
+      - name: Prepare native modules and speech assets for the update
+        if: github.event_name != 'pull_request'
+        run: |
+          sdkmanager 'ndk;28.2.13676358'
+          python3 -m pip install vosk
+          python3 tools/prepare-speech.py
+          bash tools/prepare-tunnel.sh
+          bash tools/prepare-dpi.sh
+      - name: Assemble unsigned update for signing on the owner workstation
+        if: github.event_name != 'pull_request'
+        run: |
+          gradle --no-daemon -PoldiUnsigned :app:assembleRelease
+          python3 tools/check-native-pages.py app/build/outputs/apk/release/app-release-unsigned.apk
+          mkdir -p build/update-candidate
+          cp app/build/outputs/apk/release/app-release-unsigned.apk build/update-candidate/
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" build/update-candidate/
+          git rev-parse HEAD > build/update-candidate/source-commit.txt
+          sha256sum build/update-candidate/app-release-unsigned.apk > build/update-candidate/sha256.txt
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: unsigned-update-candidate
+          path: build/update-candidate/
+          if-no-files-found: error
+          retention-days: 7
