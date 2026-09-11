@@ -20,8 +20,11 @@ public class MediaRouteInstrumentation extends Release066Instrumentation {
   until=SystemClock.elapsedRealtime()+70000;while(!TunnelStateRepository.on()&&SystemClock.elapsedRealtime()<until)Thread.sleep(150);
   check(TunnelStateRepository.on(),"Aeza preflight failed: "+TunnelStateRepository.lastError(c));mark("aeza-connect-and-youtube-tls-verified");
   YouTubeHubActivity view=hub;String page="";until=SystemClock.elapsedRealtime()+65000;
-  while(SystemClock.elapsedRealtime()<until){page=js(view.web,"JSON.stringify({title:document.title,body:document.body?document.body.innerText.slice(0,1000):''})");if(page.contains("YouTube")&&!page.contains("ERR_"))break;Thread.sleep(1000);}
-  TunnelStateRepository.refresh();check(page.contains("YouTube")&&!page.contains("ERR_"),"YouTube page failed: "+page);check(TunnelStateRepository.webConnections>0&&TunnelStateRepository.webRx>10000,"WebView did not receive bytes through Aeza");check(!view.browserActive,"Viewing opened external Chrome");shot("067-youtube-through-aeza");mark("webview-youtube-page-through-aeza");
+  // The tunnel runs in a separate process and publishes counters every 1.5 seconds.
+  // A page title can arrive before that snapshot; await both independent evidence sources.
+  while(SystemClock.elapsedRealtime()<until){page=js(view.web,"JSON.stringify({url:location.href,title:document.title,body:document.body?document.body.innerText.slice(0,1000):''})");TunnelStateRepository.refresh();if(page.contains("YouTube")&&!page.contains("ERR_")&&TunnelStateRepository.webConnections>0&&TunnelStateRepository.webRx>10000)break;Thread.sleep(500);}
+  TunnelStateRepository.refresh();shot("067-youtube-through-aeza");mark("youtube-route-counters: connections="+TunnelStateRepository.webConnections+", received="+TunnelStateRepository.webRx+", rejected="+TunnelStateRepository.webRejected+", error="+TunnelStateRepository.webError);
+  check(page.contains("YouTube")&&!page.contains("ERR_"),"YouTube page failed: "+page);check(TunnelStateRepository.webConnections>0&&TunnelStateRepository.webRx>10000,"WebView did not receive bytes through Aeza: "+page);check(!view.browserActive,"Viewing opened external Chrome");mark("webview-youtube-page-through-aeza");
   // Load a public video through the same web route, then inspect actual playback state.
   runOnMainSync(()->view.navigate("https://m.youtube.com/watch?v=jNQXAC9IVRw"));Thread.sleep(12000);
   // A real touch must hit the player; fixed screen coordinates can hit YouTube's header.
