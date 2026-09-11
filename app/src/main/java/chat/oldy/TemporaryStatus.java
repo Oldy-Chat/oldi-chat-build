@@ -1,0 +1,8 @@
+package chat.oldy;
+import android.widget.*;
+import org.json.*;
+final class TemporaryStatus {
+ static final String[] KEYS={"playing","driving","busy","available",""},LABELS={"🎮 Играю","🚘 За рулём","⏳ Занят","☎ Можно звонить","Без статуса"};
+ static String label(JSONObject user){if(user==null||user.optLong("status_until")*1000<=System.currentTimeMillis())return "";for(int n=0;n<KEYS.length-1;n++)if(KEYS[n].equals(user.optString("status")))return LABELS[n];return "";}
+ static void choose(MainActivity a){LinearLayout b=a.col();TextView duration=a.label("Статус исчезнет через 4 часа",13,a.MUTED);b.addView(duration);int[] hours={4};LinearLayout times=a.row();for(int h:new int[]{1,4,8})times.addView(a.button(h+" ч",false,()->{hours[0]=h;duration.setText("Статус исчезнет через "+h+" ч");}),new LinearLayout.LayoutParams(0,a.dp(42),1));b.addView(times);a.space(b,10);for(int n=0;n<KEYS.length;n++){final int at=n;TextView option=a.button(LABELS[n],false,()->{});option.setOnClickListener(v->{final Vault owner=a.vault;option.setEnabled(false);a.task(()->{try{JSONObject result=a.api.call("/profile/status",new JSONObject().put("status",KEYS[at]).put("hours",hours[0]),owner.token());synchronized(owner){owner.data.put("status",result.optString("status")).put("status_until",result.optLong("status_until"));owner.save();}a.runOnUiThread(()->{if(a.vault==owner){if(a.activeSheet!=null)a.activeSheet.dismiss();ProfileEditor.show(a);}});}finally{a.runOnUiThread(()->option.setEnabled(true));}});});b.addView(option);a.space(b,5);}a.sheet("Временный статус",b);for(int n=0;n<times.getChildCount();n++){final int h=new int[]{1,4,8}[n];times.getChildAt(n).setOnClickListener(v->{hours[0]=h;duration.setText("Статус исчезнет через "+h+" ч");});}}
+}

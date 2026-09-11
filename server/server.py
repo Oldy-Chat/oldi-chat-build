@@ -15,6 +15,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from disk_storage import YandexDisk,DiskError
 import legal_service
 import sticker_generation
+import account_features
 from types import SimpleNamespace
 def legal_context():return SimpleNamespace(**globals())
 from cryptography.hazmat.primitives.serialization import load_der_public_key
@@ -47,6 +48,7 @@ def init_db(path=None):
  DB.execute('PRAGMA journal_mode=WAL')
  DB.executescript('''CREATE TABLE IF NOT EXISTS users(nick TEXT PRIMARY KEY, name TEXT NOT NULL, salt TEXT NOT NULL, password TEXT NOT NULL, enc TEXT NOT NULL, sig TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS sessions(hash TEXT PRIMARY KEY, nick TEXT NOT NULL, expires INTEGER NOT NULL);''')
+ account_features.init(DB)
  DB.execute('CREATE TABLE IF NOT EXISTS contact_discovery(nick TEXT PRIMARY KEY,enabled INTEGER NOT NULL DEFAULT 0)')
  sticker_generation.init(legal_context())
  DB.execute('CREATE TABLE IF NOT EXISTS sticker_offers(id TEXT PRIMARY KEY,owner TEXT NOT NULL,title TEXT NOT NULL,price_minor INTEGER NOT NULL,currency TEXT NOT NULL,asset BLOB NOT NULL,created_at INTEGER NOT NULL)')
@@ -210,7 +212,7 @@ def store_channel_history(nick,data):
  if not isinstance(rid,str) or not isinstance(mid,str) or not re.fullmatch('[a-f0-9-]{36}',mid) or not isinstance(record['time'],int) or record['time']<1 or record['time']>time.time()*1000+300000:raise Problem(400,'Неверная публикация')
  room=room_info(rid,nick)
  if room['kind']!='channel':raise Problem(400,'Это не канал')
- fields={'kind','text','room','thread','mime','size','name','sha256','sticker','reply','link','thumb','cloud_video','round','animated','cloud_blob','blob_key','blob_iv','duration','waveform','custom_sticker','sticker_id','sticker_author','op','mid','emoji'}
+ fields={'kind','text','room','thread','mime','size','name','sha256','sticker','reply','link','thumb','cloud_video','round','animated','cloud_blob','blob_key','blob_iv','duration','waveform','silent','mini','mini_update','custom_sticker','sticker_id','sticker_author','op','mid','emoji'}
  if not isinstance(body,dict) or set(body)-fields or body.get('room')!=rid or body.get('kind') not in ('text','file','sticker','control'):raise Problem(400,'Неверное содержимое')
  if body.get('custom_sticker') and (body.get('kind')!='file' or body.get('mime')!='image/webp' or type(body.get('size')) is not int or not 1<=body['size']<=350000 or not isinstance(body.get('sticker_id'),str) or not re.fullmatch('[a-f0-9-]{36}',body['sticker_id']) or body.get('sticker_author')!=nick):raise Problem(400,'Неверный авторский стикер')
  if 'duration' in body and (not isinstance(body['duration'],int) or not 0<=body['duration']<=86400000):raise Problem(400,'Неверная длительность')
@@ -525,6 +527,7 @@ def public_user(nick):
  with LOCK:number=DB.execute('SELECT number,registered_at FROM account_numbers WHERE nick=?',(nick,)).fetchone()
  result.update(account_number=number[0] if number else 0,registered_at=number[1] if number else 0)
  result['protocol']=cap[0] if cap else 2
+ result.update(account_features.public_status(legal_context(),nick))
  return result
 def issue_session(nick):
  token=secrets.token_urlsafe(32)
@@ -612,6 +615,7 @@ class Handler(BaseHTTPRequestHandler):
    if r and r[1]<time.time()+30000000:
     DB.execute('UPDATE sessions SET expires=? WHERE hash=?',(int(time.time())+315360000,digest));DB.commit()
   if not r:raise Problem(401,'Сессия истекла. Войдите снова')
+  account_features.touch(legal_context(),digest)
   return r[0]
  def do_GET(self):self.handle_request(False)
  def do_POST(self):self.handle_request(True)
@@ -783,6 +787,10 @@ class Handler(BaseHTTPRequestHandler):
      if not r or not hmac.compare_digest(candidate,r[1]):raise Problem(401,'Неверный ник или пароль')
     return self.reply({'token':issue_session(nick),'user':private_account(nick)})
    nick=self.user()
+   if path in ('/sessions','/sessions/revoke','/profile/status'):
+    rate(('account-features',nick),60,60)
+    result=account_features.api(legal_context(),path,post,data,nick,hashlib.sha256(self.headers.get('Authorization','')[7:].encode()).hexdigest())
+    if result is not None:return self.reply(result)
    legal_result=legal_service.api(legal_context(),self,path,post,data,nick)
    if legal_result is not None:return self.reply(legal_result)
    if post:legal_service.require(legal_context(),nick,path)

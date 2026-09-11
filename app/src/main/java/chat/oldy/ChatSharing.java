@@ -1,0 +1,10 @@
+package chat.oldy;
+
+import android.widget.*;
+import org.json.*;
+import java.util.*;
+
+final class ChatSharing {
+ static void send(MainActivity a,String target,JSONObject payload){final Vault owner=a.vault;a.task(()->{if(owner!=a.vault)throw new IllegalStateException("Аккаунт изменился");if(Conversation.community(target)){JSONObject room=a.api.call("/room/"+Conversation.room(target),null,owner.token());owner.putRoom(room);JSONArray members=room.getJSONArray("members");for(int n=0;n<members.length();n++){String peer=members.getString(n);if(!peer.equals(owner.nick()))owner.pin(a.api.call("/user/"+peer,null,owner.token()));}}if(!Conversation.community(target))owner.pin(a.api.call("/user/"+target,null,owner.token()));if(owner!=a.vault)throw new IllegalStateException("Аккаунт изменился");owner.queuePayload(target,payload,null);a.runOnUiThread(()->{if(a.vault!=owner)return;if(a.screen.equals("chat")&&target.equals(a.chat))a.renderMessages();Toast.makeText(a,"Отправлено в чат",Toast.LENGTH_SHORT).show();});});}
+ static void choose(MainActivity a,JSONObject payload){try{LinearLayout b=a.col();JSONObject data=a.vault.copy(),contacts=data.getJSONObject("contacts"),rooms=data.getJSONObject("rooms");int count=0;Iterator<String> users=contacts.keys();while(users.hasNext()){String peer=users.next();if(peer.equals(a.vault.nick())||a.vault.isBlocked(peer))continue;count++;JSONObject user=contacts.getJSONObject(peer);b.addView(a.button(user.optString("name",peer)+" · @"+peer,false,()->send(a,peer,payload)));a.space(b,6);}Iterator<String> ids=rooms.keys();while(ids.hasNext()){String id=ids.next();JSONObject room=rooms.getJSONObject(id);if(room.optString("kind").equals("channel")&&!room.optString("owner").equals(a.vault.nick()))continue;count++;b.addView(a.button(room.optString("title",id),false,()->send(a,"room:"+id,payload)));a.space(b,6);}if(count==0)a.paragraph(b,"Сначала добавьте контакт или создайте чат.");a.sheet("Отправить в чат",b);}catch(Exception e){a.error(Api.message(e));}}
+}

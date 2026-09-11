@@ -52,6 +52,16 @@ class StickerGenerationTest(unittest.TestCase):
   for color in ((10,30,20,255),(0,0,0,0)):
    buffer=io.BytesIO();Image.new('RGBA',(1536,1024),color).save(buffer,format='PNG')
    with self.assertRaises(sg.GenerationError):sg.animation(buffer.getvalue())
+ def test_cell_removes_neighbour_edge_debris_but_keeps_character_and_internal_detail(self):
+  from PIL import ImageDraw
+  frame=Image.new('RGBA',(512,512));draw=ImageDraw.Draw(frame)
+  draw.rectangle((90,80,420,490),fill=(100,150,220,255))
+  draw.rectangle((1,100,5,140),fill=(200,80,30,255))
+  draw.rectangle((50,180,58,195),fill=(200,80,30,255))
+  cleaned=sg.clean_cell(frame)
+  self.assertEqual(cleaned.getpixel((3,120))[3],0)
+  self.assertEqual(cleaned.getpixel((200,200))[3],255)
+  self.assertEqual(cleaned.getpixel((54,185))[3],255)
  def test_expired_result_is_removed_without_resetting_daily_quota(self):
   with patch.object(sg,'render_sheet',return_value=sheet()):
    req=self.request();sg.api(self.s,'/stickers/generate',True,req,'alice');self.done(req['id'])

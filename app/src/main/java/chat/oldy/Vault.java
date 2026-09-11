@@ -74,7 +74,7 @@ final class Vault {
   if(old!=null&&!Crypto.fingerprint(old).equals(Crypto.fingerprint(peer)))throw new Exception(I18n.t("Ключ @")+n+I18n.t(" изменился. Передача остановлена."));
   if(old==null||!old.toString().equals(peer.toString())){data.getJSONObject("contacts").put(n,peer);save();}
  }
- synchronized void profile(JSONObject u)throws Exception{data.put("name",u.getString("name")).put("avatar",u.optString("avatar","preset:0")).put("bio",u.optString("bio")).put("email",u.optString("email")).put("email_verified",u.optBoolean("email_verified")).put("creator_video",u.optBoolean("creator_video")).put("moderator",u.optBoolean("moderator")).put("account_number",u.optLong("account_number")).put("registered_at",u.optLong("registered_at")).put("pending_email",u.optString("pending_email")).put("accepted_policy",u.optString("accepted_policy"));save();}
+ synchronized void profile(JSONObject u)throws Exception{data.put("name",u.getString("name")).put("avatar",u.optString("avatar","preset:0")).put("bio",u.optString("bio")).put("email",u.optString("email")).put("email_verified",u.optBoolean("email_verified")).put("creator_video",u.optBoolean("creator_video")).put("moderator",u.optBoolean("moderator")).put("account_number",u.optLong("account_number")).put("registered_at",u.optLong("registered_at")).put("pending_email",u.optString("pending_email")).put("accepted_policy",u.optString("accepted_policy")).put("status",u.optString("status")).put("status_until",u.optLong("status_until"));save();}
  synchronized void rooms(JSONArray rooms)throws Exception{JSONObject next=new JSONObject();for(int i=0;i<rooms.length();i++){JSONObject r=rooms.getJSONObject(i);next.put(r.getString("id"),r);}data.put("rooms",next);save();roomsRevision++;}
  synchronized JSONObject room(String id)throws Exception{return data.getJSONObject("rooms").optJSONObject(id);}
  synchronized void putRoom(JSONObject r)throws Exception{data.getJSONObject("rooms").put(r.getString("id"),r);save();roomsRevision++;}
@@ -86,7 +86,7 @@ final class Vault {
   revealChat(to);String id=java.util.UUID.randomUUID().toString();long now=System.currentTimeMillis();JSONObject p=new JSONObject(body.toString());
   JSONObject m=new JSONObject().put("id",id).put("peer",to).put("text",p.optString("text")).put("kind",p.optString("kind","text")).put("time",now).put("out",true).put("status","pending");
   if(local!=null)m.put("local",local);
-  for(String key:new String[]{"mime","size","name","sha256","sticker","reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","duration","waveform","custom_sticker","sticker_id","sticker_author"})if(p.has(key))m.put(key,p.get(key));
+  for(String key:new String[]{"mime","size","name","sha256","sticker","reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","duration","waveform","silent","mini","mini_update","custom_sticker","sticker_id","sticker_author"})if(p.has(key))m.put(key,p.get(key));
   JSONObject envelopes=new JSONObject();
   if(Conversation.community(to)){
    JSONObject r=room(Conversation.room(to));if(r==null)throw new Exception(I18n.t("Чат недоступен"));
@@ -145,7 +145,7 @@ final class Vault {
   }
   if(k.equals("sticker")){int sticker=p.optInt("sticker");m.put("sticker",sticker>=100&&sticker<108?sticker:Math.max(0,Math.min(11,sticker)));}
   if(k.equals("control"))m.put("control",p);
-  for(String extra:new String[]{"reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","duration","waveform","custom_sticker","sticker_id","sticker_author"})if(p.has(extra))m.put(extra,p.get(extra));
+  for(String extra:new String[]{"reply","link","thumb","cloud_video","round","animated","cloud_blob","blob_key","blob_iv","duration","waveform","silent","mini","mini_update","custom_sticker","sticker_id","sticker_author"})if(p.has(extra))m.put(extra,p.get(extra));
   data.getJSONArray("messages").put(m);save();
  }
  synchronized long channelCursor(String rid)throws Exception{return bucket("channel_cursors").optLong(rid);}

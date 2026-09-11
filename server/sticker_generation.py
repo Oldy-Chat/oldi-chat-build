@@ -4,6 +4,7 @@ are decoded/re-encoded in memory, never logged or saved. Results are encrypted.
 """
 import base64, hashlib, io, json, os, re, secrets, threading, time, urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
+from collections import deque
 from PIL import Image, ImageChops, ImageStat, ImageOps
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -121,12 +122,37 @@ def render_sheet(photo,action,description=''):
  except GenerationError:raise
  except Exception:raise GenerationError('PROVIDER_UNAVAILABLE') from None
 
+def clean_cell(frame):
+ # A generated sheet can spill tiny pieces of a neighbouring pose over a cell
+ # boundary. Remove only small disconnected edge pieces, retaining the character
+ # and all internal details. Never cut a component connected to the main figure.
+ alpha=frame.getchannel('A');pixels=alpha.tobytes();width,height=frame.size
+ seen=bytearray(len(pixels));components=[]
+ for start,value in enumerate(pixels):
+  if value<8 or seen[start]:continue
+  pending=deque([start]);seen[start]=1;component=[];edge=False
+  while pending:
+   at=pending.popleft();component.append(at);x,y=at%width,at//width
+   edge=edge or x<10 or x>=width-10 or y<10 or y>=height-10
+   for nx,ny in ((x-1,y),(x+1,y),(x,y-1),(x,y+1)):
+    if not 0<=nx<width or not 0<=ny<height:continue
+    n=ny*width+nx
+    if not seen[n] and pixels[n]>=8:seen[n]=1;pending.append(n)
+  components.append((component,edge))
+ if not components:return frame
+ largest=max(len(c) for c,e in components);clean=bytearray(pixels)
+ for component,edge in components:
+  if edge and len(component)<largest*.025:
+   for at in component:clean[at]=0
+ frame.putalpha(Image.frombytes('L',frame.size,bytes(clean)))
+ return frame
+
 def animation(sheet):
  try:
   with Image.open(io.BytesIO(sheet)) as source:
    if source.size!=(1536,1024) or source.format not in ('PNG','WEBP'):raise GenerationError('ANIMATION_LAYOUT')
    source.load();rgba=source.convert('RGBA')
-  frames=[rgba.crop((x*512,y*512,(x+1)*512,(y+1)*512)) for y in range(2) for x in range(3)]
+  frames=[clean_cell(rgba.crop((x*512,y*512,(x+1)*512,(y+1)*512))) for y in range(2) for x in range(3)]
   # Reject empty cells, non-transparent contact sheets and repeated static pictures.
   for frame in frames:
    alpha=frame.getchannel('A');hist=alpha.histogram()
