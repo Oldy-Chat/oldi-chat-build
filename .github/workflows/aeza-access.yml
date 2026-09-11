@@ -1,13 +1,23 @@
-# Preserved for future work. Disabled throughout the source migration.
-name: Future Aeza media VPS check (disabled)
+name: Check new Aeza media VPS access
 on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/aeza-access.yml', 'tools/aeza/check_access.py', 'tools/aeza/inspect_media_vps.py']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   check:
-    if: ${{ false }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - run: echo 'VPS checks are disabled; no SSH connection is attempted.'
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Inspect only the new media VPS; do not deploy
+        env:
+          AEZA_SSH_PRIVATE_KEY: ${{ secrets.AEZA_SSH_PRIVATE_KEY }}
+          AEZA_SSH_KNOWN_HOSTS: ${{ secrets.AEZA_SSH_KNOWN_HOSTS }}
+          AEZA_SSH_USER: ${{ secrets.AEZA_SSH_USER }}
+          AEZA_SSH_KEY_PASSPHRASE: ${{ secrets.AEZA_SSH_KEY_PASSPHRASE }}
+        run: python3 tools/aeza/check_access.py
