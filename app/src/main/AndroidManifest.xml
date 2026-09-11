@@ -25,7 +25,7 @@
   <service android:name=".LocalTunnelService" android:process=":youtube_tunnel" android:exported="true" android:permission="android.permission.BIND_VPN_SERVICE" android:foregroundServiceType="specialUse">
    <intent-filter><action android:name="android.net.VpnService"/></intent-filter>
    <meta-data android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON" android:value="false"/>
-   <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-initiated local per-app YouTube network relay; no remote VPN endpoint"/>
+   <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-initiated per-app YouTube traffic through the separate Oldi media VPS"/>
   </service>
   <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:configChanges="orientation|screenSize|keyboardHidden" android:windowSoftInputMode="adjustResize">
    <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>

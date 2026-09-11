@@ -1,7 +1,7 @@
 name: Verify Oldi Chat sources
 on:
   push:
-    branches: [main]
+    branches: [main, fix/aeza-in-app-media]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -117,12 +117,19 @@ jobs:
       - name: Verify the new menus and editor on Android
         if: github.event_name != 'pull_request'
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          AEZA_SSH_PRIVATE_KEY: ${{ secrets.AEZA_SSH_PRIVATE_KEY }}
+          AEZA_SSH_KNOWN_HOSTS: ${{ secrets.AEZA_SSH_KNOWN_HOSTS }}
+          AEZA_SSH_USER: ${{ secrets.AEZA_SSH_USER }}
+          AEZA_SSH_KEY_PASSPHRASE: ${{ secrets.AEZA_SSH_KEY_PASSPHRASE }}
         with:
           api-level: 35
           arch: x86_64
           profile: pixel_2
           disable-animations: false
-          script: bash tools/ci-android-ui.sh
+          script: |
+            bash tools/ci-android-ui.sh
+            python3 tools/aeza/verify_android_route.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

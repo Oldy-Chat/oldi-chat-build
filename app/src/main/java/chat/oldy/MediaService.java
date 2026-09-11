@@ -40,7 +40,7 @@ final class MediaService {
   OutputStream getOutputStream()throws IOException{return socket.getOutputStream();}
   public void close()throws IOException{socket.close();}
  }
- static Pipe connect(VpnService service,Network network,String host)throws Exception{
+ static Pipe connect(LocalTunnelService service,Network network,String host)throws Exception{
   if(!YouTubeDomainRules.allowed(host))throw new IOException("DOMAIN_DENIED");
   Socket transport=new Socket();SSLSocket tls=null;
   try{
@@ -48,12 +48,33 @@ final class MediaService {
    transport.connect(new InetSocketAddress(HOST,PORT),10000);
    tls=(SSLSocket)factory(service).createSocket(transport,HOST,PORT,true);tls.setSoTimeout(15000);tls.startHandshake();
    // The service is pinned before account authentication is transmitted.
-   String token=ChatService.vault(service).token();if(token.isEmpty()||token.indexOf('\r')>=0||token.indexOf('\n')>=0)throw new IOException("ACCOUNT_REQUIRED");
+   String token=service.credential;if(token.isEmpty()||token.indexOf('\r')>=0||token.indexOf('\n')>=0)throw new IOException("ACCOUNT_REQUIRED");
    String request="CONNECT "+host+":443 HTTP/1.1\r\nHost: "+host+":443\r\nProxy-Authorization: Bearer "+token+"\r\n\r\n";
    tls.getOutputStream().write(request.getBytes(StandardCharsets.US_ASCII));tls.getOutputStream().flush();
    ByteArrayOutputStream response=new ByteArrayOutputStream();int tail=0;while(response.size()<8192){int b=tls.getInputStream().read();if(b<0)throw new EOFException();response.write(b);tail=(tail<<8)|b;if(tail==0x0d0a0d0a)break;}
-   if(tail!=0x0d0a0d0a||!response.toString("US-ASCII").startsWith("HTTP/1.1 200 "))throw new IOException("MEDIA_PROXY_UNAVAILABLE");
+   String header=response.toString("US-ASCII");
+   if(tail!=0x0d0a0d0a)throw new IOException("MEDIA_PROXY_HEADER");
+   if(header.startsWith("HTTP/1.1 401 "))throw new IOException("ACCOUNT_REQUIRED");
+   if(header.startsWith("HTTP/1.1 429 "))throw new IOException("MEDIA_BUSY");
+   if(!header.startsWith("HTTP/1.1 200 "))throw new IOException("MEDIA_PROXY_UNAVAILABLE");
    tls.setSoTimeout(120000);return new Pipe(tls);
   }catch(Exception error){if(tls!=null)tls.close();else transport.close();throw error;}
+ }
+ // A real HTTPS response inside CONNECT: validates account, relay, DNS and YouTube TLS.
+ static void verifyRoute(LocalTunnelService service,Network network)throws Exception{
+  String host="m.youtube.com";
+  try(Pipe pipe=connect(service,network,host)){
+   try(SSLSocket youtube=(SSLSocket)((SSLSocketFactory)SSLSocketFactory.getDefault()).createSocket(pipe.socket,host,443,true)){
+    SSLParameters parameters=youtube.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");youtube.setSSLParameters(parameters);youtube.setSoTimeout(15000);youtube.startHandshake();
+    youtube.getOutputStream().write(("HEAD / HTTP/1.1\r\nHost: "+host+"\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));youtube.getOutputStream().flush();
+    ByteArrayOutputStream line=new ByteArrayOutputStream();for(int n=0;n<512;n++){int b=youtube.getInputStream().read();if(b<0)throw new EOFException();if(b==10)break;line.write(b);}
+    if(!line.toString("US-ASCII").matches("HTTP/1\\.[01] [23][0-9]{2} .*\\r?"))throw new IOException("YOUTUBE_RESPONSE_FAILED");
+   }
+  }
+ }
+ static String connectionError(Throwable error){
+  for(Throwable e=error;e!=null;e=e.getCause())if(e instanceof SSLException)return "MEDIA_TLS_FAILED";
+  if(error instanceof SocketTimeoutException)return "MEDIA_TIMEOUT";
+  String code=error.getMessage();return code!=null&&code.matches("ACCOUNT_REQUIRED|MEDIA_BUSY|MEDIA_PROXY_UNAVAILABLE|MEDIA_PROXY_HEADER|YOUTUBE_RESPONSE_FAILED|PROTECT_FAILED|NO_NETWORK|MEDIA_NOT_CONFIGURED")?code:"MEDIA_CONNECTION_FAILED";
  }
 }
