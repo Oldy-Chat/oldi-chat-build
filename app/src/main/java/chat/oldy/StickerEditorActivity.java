@@ -1,7 +1,7 @@
 package chat.oldy;
 import android.app.*;import android.content.*;import android.graphics.*;import android.graphics.drawable.GradientDrawable;import android.net.Uri;import android.os.*;import android.view.*;import android.widget.*;import java.io.*;import java.util.*;import java.util.concurrent.*;import org.json.*;
 
-/** Real generative frames, with explicit photo-sharing consent. No filter/rotation fallback. */
+/** Original character frames requested by the owner pressing Create. */
 public final class StickerEditorActivity extends Activity {
  final ExecutorService work=Executors.newSingleThreadExecutor();final Handler ui=new Handler(Looper.getMainLooper());
  Cutout canvas;LinearLayout body;FrameLayout stage;EditText title,description;boolean textMode;TextView status,createKey,saveKey,saveOnly;StickerImageView animatedPreview;ProgressBar progress;
@@ -45,10 +45,10 @@ public final class StickerEditorActivity extends Activity {
   if(code.equals("PROVIDER_CREDENTIALS")||code.equals("PROVIDER_ACCESS")||code.equals("PROVIDER_VERIFICATION")||code.equals("PROVIDER_MODEL")||code.equals("PROVIDER_REGION")||code.equals("PROVIDER_SCOPE"))return tr("Создание стикеров сейчас недоступно. Обратитесь в поддержку Oldi.","Sticker creation is currently unavailable. Contact Oldi support.");
   if(code.equals("PROVIDER_BILLING"))return tr("Создание стикеров временно приостановлено. Попробуйте позже.","Sticker creation is temporarily paused. Try later.");
   if(code.equals("STICKER_QUEUE_FULL"))return tr("Сейчас большая очередь. Попробуйте чуть позже.","The queue is busy. Try again shortly.");
-  if(code.equals("STICKER_DAILY_LIMIT"))return tr("Лимит создания на сегодня достигнут. Попробуйте завтра.","Today's creation limit was reached. Try tomorrow.");
+  if(code.equals("STICKER_DAILY_LIMIT"))return tr("Сегодня создание стикеров недоступно. Попробуйте завтра.","Sticker creation is unavailable today. Try tomorrow.");
   if(code.contains("LIMIT"))return tr("Генератор занят. Попробуйте позже.","The generator is busy. Try later.");
-  if(code.equals("PROVIDER_REJECTED"))return tr("Не удалось обработать это фото. Попробуйте другое.","This photo could not be processed. Try another.");
-  if(code.startsWith("ANIMATION_"))return tr("Не удалось собрать анимацию. Попробуйте другое фото.","Could not assemble the animation. Try another photo.");
+  if(code.equals("PROVIDER_REJECTED"))return tr("Не удалось создать этот стикер. Попробуйте другое фото или описание.","Could not create this sticker. Try another photo or description.");
+  if(code.startsWith("ANIMATION_"))return tr("Не удалось собрать анимацию. Попробуйте другое фото или описание.","Could not assemble the animation. Try another photo or description.");
   if(code.equals("SERVER_RESTARTED")||code.equals("STICKER_EXPIRED")||code.equals("STICKER_JOB_NOT_FOUND"))return tr("Незавершённое создание недоступно. Попробуйте создать стикер снова.","The unfinished creation is unavailable. Try creating the sticker again.");
   return tr("Не удалось получить результат. Нажмите «Проверить готовность».","Could not retrieve the result. Tap Check progress.");
  }
