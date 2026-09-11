@@ -69,7 +69,9 @@ class MediaTest(unittest.TestCase):
     body=dict(id=str(uuid.uuid4()),action='wave',consent_version=1,**changes)
     self.assertEqual(self.request('/stickers/generate',body)[0],400)
    self.assertEqual(self.request('/stickers/collection',token='bad')[0],401);provider.assert_not_called()
-  self.assertEqual(self.request('/health',token='')[1]['service'],'oldi-media')
+  health=self.request('/health',token='')[1]
+  self.assertEqual(health['service'],'oldi-media')
+  self.assertEqual(health['code_sha256'],hashlib.sha256(Path(media.__file__).read_bytes()).hexdigest())
  def test_photo_upload_arriving_in_separate_network_packets(self):
   photo=io.BytesIO()
   generation.Image.new('RGB',(512,512),(110,80,65)).save(photo,format='JPEG')

@@ -7,7 +7,8 @@ import java.util.*;
 
 /** Account-owned views over existing messages. Filtering never moves or deletes attachments. */
 final class PersonalHub {
- static LinearLayout page(MainActivity a,String title){a.base("personal");a.title(title,()->SettingsHome.own(a));ScrollView scroll=new RefreshScrollView(a);LinearLayout b=a.col();scroll.addView(b);a.root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));SideNavigation.navigation(a,3);return b;}
+ static LinearLayout page(MainActivity a,String title){return page(a,title,()->SettingsHome.own(a));}
+ static LinearLayout page(MainActivity a,String title,Runnable back){a.base("personal");a.title(title,back);ScrollView scroll=new RefreshScrollView(a);LinearLayout b=a.col();scroll.addView(b);a.root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));SideNavigation.navigation(a,3);return b;}
  static boolean link(JSONObject m){return m.has("link")||android.util.Patterns.WEB_URL.matcher(m.optString("text")).find();}
  static String category(JSONObject m){if(m.optString("kind").equals("file"))return m.optString("mime").startsWith("image/")?"photos":"files";return link(m)?"links":"important";}
  static void open(MainActivity a,JSONObject m){a.openChat(m.optString("peer"));a.ui.postDelayed(()->a.jump(m.optString("id")),180);}

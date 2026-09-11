@@ -41,7 +41,7 @@ def main():
     public.connect()
     if not hmac.compare_digest(hashlib.sha256(public.sock.getpeercert(binary_form=True)).hexdigest(),report['certificate_sha256']):raise RuntimeError('EXTERNAL_MEDIA_CERTIFICATE_FAILED')
     public.request('GET','/health');response=public.getresponse();health=json.loads(response.read(4096))
-    if response.status!=200 or health.get('service')!='oldi-media':raise RuntimeError('EXTERNAL_MEDIA_HEALTH_FAILED')
+    if response.status!=200 or health.get('service')!='oldi-media' or health.get('code_sha256')!=hashlib.sha256(package['files']['media_service.py'].encode()).hexdigest():raise RuntimeError('EXTERNAL_MEDIA_HEALTH_FAILED')
     report['external_health_verified']=True
    finally:public.close()
    if report.get('live_generation',{}).get('success'):

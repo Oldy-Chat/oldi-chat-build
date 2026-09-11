@@ -24,6 +24,10 @@ import sticker_generation
 import sticker_collection
 import assistant_text
 
+# A public health response identifies the actual loaded source, not just a live port.
+try: SOURCE_SHA256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+except (NameError,OSError): SOURCE_SHA256=''
+
 ROOTS=('youtube.com','youtube-nocookie.com','youtu.be','googlevideo.com','ytimg.com',
        'youtubei.googleapis.com','youtube.googleapis.com','ggpht.com','accounts.google.com',
        'accounts.google.ru','oauth2.googleapis.com','gstatic.com','googleusercontent.com')
@@ -149,7 +153,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
   return b''.join(chunks)
  def api(self,post):
   try:
-   if self.path=='/health' and not post:return self.json(200,{'service':'oldi-media','version':1,'youtube_proxy':True})
+   if self.path=='/health' and not post:return self.json(200,{'service':'oldi-media','version':1,'youtube_proxy':True,'code_sha256':SOURCE_SHA256})
    owner=self.account();self.server.state.rate(('media-api',owner),180,60)
    if self.headers.get('Transfer-Encoding'):raise Problem(400,'BODY_INVALID')
    try:length=int(self.headers.get('Content-Length','0'))

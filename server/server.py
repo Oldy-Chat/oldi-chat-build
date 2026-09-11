@@ -1218,7 +1218,7 @@ class Handler(BaseHTTPRequestHandler):
     return self.reply({'ok':True})
    if path.startswith('/typing/') and not post:
     peer=path[8:]
-    return self.reply({'typing':TYPING.get((peer,nick),0)>time.monotonic()})
+    return self.reply({'typing':TYPING.get((peer,nick),0)>time.monotonic(),**({} if blocked(nick,peer) else account_features.public_status(legal_context(),peer))})
    if path=='/me' and not post:return self.reply(private_account(nick))
    if path=='/logout' and post:
     with LOCK:DB.execute('DELETE FROM sessions WHERE hash=?',(hashlib.sha256(self.headers['Authorization'][7:].encode()).hexdigest(),));DB.commit()

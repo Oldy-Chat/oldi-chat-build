@@ -4,7 +4,7 @@ set -euo pipefail
 if [[ $(id -u) != 0 ]]; then echo 'Run this installer as root.'; exit 1; fi
 oldy_src="$(cd "$(dirname "$0")" && pwd)"
 if [[ ! -f "$oldy_src/server.py" ]]; then echo 'server.py is missing'; exit 1; fi
-python3 -m py_compile "$oldy_src/server.py" "$oldy_src/legal_service.py"
+python3 -m py_compile "$oldy_src/server.py" "$oldy_src/legal_service.py" "$oldy_src/account_features.py"
 # Make a consistent SQLite snapshot before an additive migration.
 oldy_backup="/var/backups/oldy-chat/$(date -u +%Y%m%d-%H%M%S)"
 install -d -m 700 "$oldy_backup"
@@ -37,7 +37,7 @@ install -d -o root -g root -m 755 /opt/oldy-chat
 install -d -o oldy-chat -g oldy-chat -m 700 /var/lib/oldy-chat
 install -d -o root -g oldy-chat -m 750 /etc/oldy-chat
 install -o root -g root -m 644 "$oldy_src/server.py" /opt/oldy-chat/server.py
-for oldy_legal_file in legal_service.py legal_texts.json configure-legal.py retention.py sticker_generation.py configure-stickers.py sticker_diagnostics.py; do
+for oldy_legal_file in account_features.py legal_service.py legal_texts.json configure-legal.py retention.py sticker_generation.py configure-stickers.py sticker_diagnostics.py; do
  install -o root -g root -m 644 "$oldy_src/$oldy_legal_file" "/opt/oldy-chat/$oldy_legal_file"
 done
 python3 /opt/oldy-chat/configure-stickers.py --enable-all --no-restart
