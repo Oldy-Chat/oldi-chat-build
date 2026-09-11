@@ -12,6 +12,7 @@ for lang,name in [('ru','vosk-model-small-ru-0.22'),('en','vosk-model-small-en-u
  if hashlib.sha256(dest.read_bytes()).hexdigest()!=expected_hashes[lang]:raise RuntimeError('Model release checksum changed')
  models[lang]={'name':name,'url':url,'sha256':hashlib.sha256(dest.read_bytes()).hexdigest(),'size':dest.stat().st_size,'license':'Apache-2.0'}
  target=root/'tests/assets/speech'/('model-'+lang+'.zip');target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(dest,target)
+ bundled=root/'app/src/main/assets/speech'/('model-'+lang+'.zip');bundled.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(dest,bundled)
 (root/'app/src/main/assets/speech-models.json').write_text(json.dumps(models,indent=2))
 fixture=root/'tests/assets/speech/en.wav'
 if not fixture.exists():

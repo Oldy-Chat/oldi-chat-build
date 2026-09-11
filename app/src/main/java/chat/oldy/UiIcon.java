@@ -14,6 +14,7 @@ final class UiIcon extends View {
   paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(2.2f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);paint.setColor(color);
   Path p=new Path();
   switch(symbol){
+   case "sparkles":p.moveTo(12,2);p.lineTo(15,9);p.lineTo(22,12);p.lineTo(15,15);p.lineTo(12,22);p.lineTo(9,15);p.lineTo(2,12);p.lineTo(9,9);p.close();c.drawPath(p,paint);break;
    case "profile":c.drawCircle(12,7,4,paint);p.moveTo(3,22);p.cubicTo(3,12,21,12,21,22);c.drawPath(p,paint);break;
    case "contacts":c.drawCircle(8,7,3,paint);c.drawCircle(17,8,2.5f,paint);p.moveTo(1,21);p.cubicTo(1,12,15,12,15,21);p.moveTo(17,14);p.cubicTo(21,14,23,17,23,21);c.drawPath(p,paint);break;
    case "settings":c.drawCircle(12,12,6,paint);c.drawCircle(12,12,2,paint);for(int i=0;i<8;i++){double angle=i*Math.PI/4;c.drawLine(12+6*(float)Math.cos(angle),12+6*(float)Math.sin(angle),12+9*(float)Math.cos(angle),12+9*(float)Math.sin(angle),paint);}break;

@@ -22,6 +22,7 @@ import time
 from types import SimpleNamespace
 import sticker_generation
 import sticker_collection
+import assistant_text
 
 ROOTS=('youtube.com','youtube-nocookie.com','youtu.be','googlevideo.com','ytimg.com',
        'youtubei.googleapis.com','youtube.googleapis.com','ggpht.com','accounts.google.com',
@@ -165,6 +166,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
    result=youtube_preview(self.path) if not post else None
    if result is None:result=sticker_collection.api(self.server.state,self.path,post,data,owner)
    if result is None:result=sticker_generation.api(self.server.state,self.path,post,data,owner)
+   if result is None:result=assistant_text.api(self.server.state,self.path,post,data,owner)
    if result is None:raise Problem(404,'NOT_FOUND')
    self.json(200,result)
   except Problem as error:self.json(error.status,{'error':error.code})

@@ -212,7 +212,7 @@ def store_channel_history(nick,data):
  if not isinstance(rid,str) or not isinstance(mid,str) or not re.fullmatch('[a-f0-9-]{36}',mid) or not isinstance(record['time'],int) or record['time']<1 or record['time']>time.time()*1000+300000:raise Problem(400,'Неверная публикация')
  room=room_info(rid,nick)
  if room['kind']!='channel':raise Problem(400,'Это не канал')
- fields={'kind','text','room','thread','mime','size','name','sha256','sticker','reply','link','thumb','cloud_video','round','animated','cloud_blob','blob_key','blob_iv','duration','waveform','silent','mini','mini_update','custom_sticker','sticker_id','sticker_author','op','mid','emoji'}
+ fields={'kind','text','room','thread','mime','size','name','sha256','sticker','reply','link','thumb','cloud_video','round','animated','cloud_blob','blob_key','blob_iv','duration','waveform','transcript','transcript_language','silent','mini','mini_update','custom_sticker','sticker_id','sticker_author','op','mid','emoji'}
  if not isinstance(body,dict) or set(body)-fields or body.get('room')!=rid or body.get('kind') not in ('text','file','sticker','control'):raise Problem(400,'Неверное содержимое')
  if body.get('custom_sticker') and (body.get('kind')!='file' or body.get('mime')!='image/webp' or type(body.get('size')) is not int or not 1<=body['size']<=350000 or not isinstance(body.get('sticker_id'),str) or not re.fullmatch('[a-f0-9-]{36}',body['sticker_id']) or body.get('sticker_author')!=nick):raise Problem(400,'Неверный авторский стикер')
  if 'duration' in body and (not isinstance(body['duration'],int) or not 0<=body['duration']<=86400000):raise Problem(400,'Неверная длительность')

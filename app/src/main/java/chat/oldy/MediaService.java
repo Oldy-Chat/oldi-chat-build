@@ -25,7 +25,7 @@ final class MediaService {
   }};SSLContext tls=SSLContext.getInstance("TLS");tls.init(null,managers,new SecureRandom());return tls.getSocketFactory();
  }
  static JSONObject call(Context c,String path,JSONObject body,String token)throws Exception{
-  if(!path.equals("/health")&&(!path.matches("/(stickers|youtube)/[A-Za-z0-9/_-]+")||token.isEmpty()))throw new IOException("MEDIA_REQUEST");
+  if(!path.equals("/health")&&(!path.matches("/(stickers|youtube|assistant)/[A-Za-z0-9/_-]+")||token.isEmpty()))throw new IOException("MEDIA_REQUEST");
   HttpsURLConnection connection=(HttpsURLConnection)new URL("https://"+HOST+":"+PORT+path).openConnection(Proxy.NO_PROXY);
   connection.setSSLSocketFactory(factory(c));connection.setConnectTimeout(15000);connection.setReadTimeout(40000);connection.setInstanceFollowRedirects(false);
   connection.setRequestProperty("Authorization","Bearer "+token);connection.setRequestProperty("Accept","application/json");

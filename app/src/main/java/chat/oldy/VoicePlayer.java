@@ -21,7 +21,7 @@ final class VoicePlayer {
       player=new MediaPlayer();MediaPlayer current=player;
       current.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build());
       current.setDataSource(new MediaDataSource(){public long getSize(){return bytes.length;}public int readAt(long p,byte[] out,int off,int n){if(p<0)return -1;if(p>=bytes.length)return -1;int count=Math.min(n,bytes.length-(int)p);System.arraycopy(bytes,(int)p,out,off,count);return count;}public void close(){}});
-      current.setOnPreparedListener(p->{if(serial!=generation)return;loading=false;ready=true;p.start();});
+      current.setOnPreparedListener(p->{if(serial!=generation)return;loading=false;ready=true;p.start();EventExpiry.notify(account,message,"open",a.work);});
       current.setOnCompletionListener(p->{if(serial==generation)p.seekTo(0);});
       current.setOnErrorListener((p,w,e)->{if(serial==generation)fail(I18n.t("Не удалось воспроизвести запись. Нажми, чтобы повторить."));return true;});
       current.prepareAsync();

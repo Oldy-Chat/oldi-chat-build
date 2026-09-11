@@ -16,7 +16,7 @@ import types
 
 package=json.loads(sys.stdin.readline())
 if '2.56.174.123' not in __import__('subprocess').check_output(['hostname','-I'],text=True).split():raise RuntimeError('WRONG_HOST')
-for name in ('sticker_generation','sticker_collection','media_service'):
+for name in ('sticker_generation','sticker_collection','assistant_text','media_service'):
  module=types.ModuleType(name);sys.modules[name]=module
  exec(compile(package['files'][name],'<ci-'+name+'>','exec'),module.__dict__)
 media=sys.modules['media_service']

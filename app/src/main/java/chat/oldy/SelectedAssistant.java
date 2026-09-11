@@ -1,0 +1,10 @@
+package chat.oldy;
+import android.content.*;
+import android.widget.*;
+import org.json.*;
+import java.util.*;
+
+final class SelectedAssistant {
+ static void show(MainActivity a,List<JSONObject> selected){StringBuilder text=new StringBuilder();for(JSONObject message:selected){if(message.optString("kind").equals("control"))continue;if(text.length()>0)text.append("\n\n");text.append(message.optBoolean("out")?a.vault.nick():message.optString("from")).append(": ").append(Payload.preview(message));}if(text.length()==0||text.length()>32000){a.error("Выберите фрагмент до 32 000 символов.");return;}String input=text.toString();LinearLayout b=a.col();a.paragraph(b,"Обработать только выбранные сообщения");String[] keys={"summary","translate","explain","tasks"},names={"Кратко пересказать","Перевести","Объяснить","Составить список задач"};for(int i=0;i<keys.length;i++){String op=keys[i];b.addView(a.button(names[i],false,()->{if(op.equals("translate"))a.dialog().setTitle("Язык перевода").setItems(new String[]{"Русский","English"},(d,n)->run(a,input,op,n==0?"ru":"en")).show();else run(a,input,op,I18n.language());}));a.space(b,6);}a.sheet("AI для фрагмента",b);}
+ static void run(MainActivity a,String input,String operation,String language){final Vault owner=a.vault;LinearLayout b=a.col();TextView state=a.label("Готовим результат…",16,a.TEXT);state.setTextIsSelectable(true);b.addView(state);a.sheet("Выбранный фрагмент",b);a.work.execute(()->{try{JSONObject response=MediaService.call(a,"/assistant/text",new JSONObject().put("text",input).put("operation",operation).put("language",language),owner.token());String text=response.getString("text");a.runOnUiThread(()->{if(a.isDestroyed()||a.vault!=owner)return;state.setText(text);a.space(b,14);b.addView(a.button("Копировать",false,()->a.getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText("Oldi",text))));});}catch(Exception e){a.runOnUiThread(()->{if(a.isDestroyed()||a.vault!=owner)return;state.setText("Не удалось обработать фрагмент. Попробуйте ещё раз.");b.addView(a.button("Повторить",false,()->run(a,input,operation,language)));});}});}
+}

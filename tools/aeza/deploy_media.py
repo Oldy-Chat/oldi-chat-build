@@ -20,7 +20,7 @@ def main():
  if not key or not known or not re.fullmatch('[a-z_][a-z0-9_-]{0,31}',user):raise RuntimeError('SSH_SETUP_REQUIRED')
  if len(known.split())!=3 or known.split()[:2]!=[HOST,'ssh-ed25519']:raise RuntimeError('HOST_KEY_REQUIRED')
  revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
- package={'revision':revision,'files':{name:(ROOT/'server'/name).read_text() for name in ('media_service.py','sticker_generation.py','sticker_collection.py')},'openai_key':os.environ.get('OLDY_STICKER_OPENAI_KEY','')}
+ package={'revision':revision,'files':{name:(ROOT/'server'/name).read_text() for name in ('media_service.py','sticker_generation.py','sticker_collection.py','assistant_text.py')},'openai_key':os.environ.get('OLDY_STICKER_OPENAI_KEY','')}
  env={k:v for k,v in os.environ.items() if not k.startswith(('AEZA_','OLDY_'))}
  with tempfile.TemporaryDirectory(prefix='oldi-media-deploy-') as folder:
   folder=Path(folder);identity=folder/'identity';identity.write_text(key+'\n');identity.chmod(0o600)

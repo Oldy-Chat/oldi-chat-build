@@ -19,7 +19,7 @@
  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
  <queries><intent><action android:name="android.support.customtabs.action.CustomTabsService"/></intent></queries>
  <application android:name=".OldyApplication" android:label="OldЫ Chat" android:theme="@style/AppTheme" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
-  <activity android:name=".YouTubeHubActivity" android:exported="false"/>
+  <activity android:name=".YouTubeHubActivity" android:configChanges="orientation|screenSize|keyboardHidden" android:exported="false"/>
   <activity android:name=".StickerEditorActivity" android:exported="false"/>
   <activity android:name=".AudioLabActivity" android:exported="false"/>
   <activity android:name=".OldiYouTubePlayer" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden"/>

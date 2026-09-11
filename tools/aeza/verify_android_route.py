@@ -34,7 +34,7 @@ def main():
    if loaded.returncode:raise RuntimeError('SSH_KEY_FAILED')
    command='/opt/oldi-media/venv/bin/python -u -c '+shlex.quote((ROOT/'tools/aeza/route_fixture.py').read_text())
    ssh=subprocess.Popen(['ssh','-F','/dev/null','-T','-i',str(identity),'-o','IdentitiesOnly=yes','-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','UserKnownHostsFile='+str(hosts),'-o','GlobalKnownHostsFile=/dev/null','-o','ForwardAgent=no','-o','ExitOnForwardFailure=yes','-o','ConnectTimeout=15','-L','127.0.0.1:29443:127.0.0.1:29443',user+'@'+HOST,command],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
-   payload={'token':token,'files':{name:(ROOT/'server'/(name+'.py')).read_text() for name in ('media_service','sticker_generation','sticker_collection')}}
+   payload={'token':token,'files':{name:(ROOT/'server'/(name+'.py')).read_text() for name in ('media_service','sticker_generation','sticker_collection','assistant_text')}}
    ssh.stdin.write(json.dumps(payload).encode()+b'\n');ssh.stdin.flush()
    if not select.select([ssh.stdout],[],[],30)[0]:raise RuntimeError('VPS_FIXTURE_TIMEOUT')
    line=ssh.stdout.readline()

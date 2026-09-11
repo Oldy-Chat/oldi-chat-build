@@ -12,7 +12,7 @@ import sys
 import time
 
 HOST='2.56.174.123'
-FILES={'media_service.py','sticker_generation.py','sticker_collection.py'}
+FILES={'media_service.py','sticker_generation.py','sticker_collection.py','assistant_text.py'}
 
 def run(*args):
  try:return subprocess.run(args,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=300)
