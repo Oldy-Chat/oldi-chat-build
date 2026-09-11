@@ -1,0 +1,38 @@
+"""Upload only the media package to the known new VPS via strict host-key verification."""
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import subprocess
+import sys
+import tempfile
+
+HOST='2.56.174.123'
+ROOT=Path(__file__).resolve().parents[2]
+
+def main():
+ key=os.environ.get('AEZA_SSH_PRIVATE_KEY','').strip();known=os.environ.get('AEZA_SSH_KNOWN_HOSTS','').strip();user=os.environ.get('AEZA_SSH_USER','').strip()
+ if not key or not known or not re.fullmatch('[a-z_][a-z0-9_-]{0,31}',user):raise RuntimeError('SSH_SETUP_REQUIRED')
+ if len(known.split())!=3 or known.split()[:2]!=[HOST,'ssh-ed25519']:raise RuntimeError('HOST_KEY_REQUIRED')
+ revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+ package={'revision':revision,'files':{name:(ROOT/'server'/name).read_text() for name in ('media_service.py','sticker_generation.py','sticker_collection.py')},'openai_key':os.environ.get('OLDY_STICKER_OPENAI_KEY','')}
+ env={k:v for k,v in os.environ.items() if not k.startswith(('AEZA_','OLDY_'))}
+ with tempfile.TemporaryDirectory(prefix='oldi-media-deploy-') as folder:
+  folder=Path(folder);identity=folder/'identity';identity.write_text(key+'\n');identity.chmod(0o600)
+  hosts=folder/'hosts';hosts.write_text(known+'\n');hosts.chmod(0o600)
+  ask=folder/'askpass';ask.write_text('#!/bin/sh\nprintf \'%s\' "$AEZA_SSH_KEY_PASSPHRASE"\n');ask.chmod(0o700)
+  agent=subprocess.run(['ssh-agent','-s'],capture_output=True,text=True,env=env,check=True)
+  values=dict(re.findall(r'(SSH_AUTH_SOCK|SSH_AGENT_PID)=([^;\n]+);',agent.stdout));env.update(values)
+  try:
+   loaded=subprocess.run(['ssh-add',str(identity)],input=b'',capture_output=True,timeout=15,env=dict(env,DISPLAY='oldi:0',SSH_ASKPASS=str(ask),SSH_ASKPASS_REQUIRE='force',AEZA_SSH_KEY_PASSPHRASE=os.environ.get('AEZA_SSH_KEY_PASSPHRASE','')))
+   if loaded.returncode:raise RuntimeError('SSH_KEY_FAILED')
+   command='python3 -c '+shlex.quote((ROOT/'tools/aeza/install_media.py').read_text())
+   result=subprocess.run(['ssh','-F','/dev/null','-T','-i',str(identity),'-o','IdentitiesOnly=yes','-o','BatchMode=yes','-o','StrictHostKeyChecking=yes','-o','UserKnownHostsFile='+str(hosts),'-o','GlobalKnownHostsFile=/dev/null','-o','ForwardAgent=no','-o','ClearAllForwardings=yes','-o','ConnectTimeout=15',user+'@'+HOST,command],input=json.dumps(package).encode(),env=env,check=True,timeout=900,capture_output=True)
+   report=json.loads(result.stdout.decode().strip().splitlines()[-1]);print(json.dumps(report))
+  finally:subprocess.run(['ssh-agent','-k'],env=env,capture_output=True,timeout=10)
+
+if __name__=='__main__':
+ try:main()
+ except Exception as error:
+  print('MEDIA_DEPLOY_FAILED: '+(str(error) if isinstance(error,RuntimeError) else type(error).__name__));sys.exit(1)

@@ -1,0 +1,55 @@
+name: Deploy separate Aeza media service
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/media_service.py'
+      - 'server/sticker_collection.py'
+      - 'server/sticker_generation.py'
+      - 'tools/aeza/deploy_media.py'
+      - 'tools/aeza/install_media.py'
+      - '.github/workflows/aeza-media.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: oldi-aeza-media
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 tools/check-source-policy.py
+      - run: |
+          python3 -m pip install -r tools/ci-python-requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python3 tools/ci-server-tests.py
+  deploy:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install only the independent media service on the new VPS
+        env:
+          AEZA_SSH_PRIVATE_KEY: ${{ secrets.AEZA_SSH_PRIVATE_KEY }}
+          AEZA_SSH_KNOWN_HOSTS: ${{ secrets.AEZA_SSH_KNOWN_HOSTS }}
+          AEZA_SSH_USER: ${{ secrets.AEZA_SSH_USER }}
+          AEZA_SSH_KEY_PASSPHRASE: ${{ secrets.AEZA_SSH_KEY_PASSPHRASE }}
+          OLDY_STICKER_OPENAI_KEY: ${{ secrets.OLDY_STICKER_OPENAI_KEY }}
+        run: |
+          set -o pipefail
+          mkdir -p build
+          python3 tools/aeza/deploy_media.py | tee build/media-deployment.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: media-deployment-report
+          path: build/media-deployment.json
+          retention-days: 14

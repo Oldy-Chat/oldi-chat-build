@@ -83,6 +83,8 @@ jobs:
       - name: Prepare native modules and speech assets for the update
         if: github.event_name != 'pull_request'
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
           sdkmanager 'ndk;28.2.13676358'
           python3 -m pip install vosk
           python3 tools/prepare-speech.py

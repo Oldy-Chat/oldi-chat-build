@@ -100,6 +100,11 @@ class MediaTest(unittest.TestCase):
      while not header.endswith(b'\r\n\r\n'):header+=c.recv(1)
      self.assertIn(b' 200 ',header);payload=b'\x16\x03\x03opaque-test-tls';c.sendall(payload);self.assertEqual(c.recv(64),payload)
   finally:thread.join(5);echo.close()
+ def test_account_pin_is_checked_before_transmitting_the_token(self):
+  with patch.object(media.http.client,'HTTPSConnection') as constructor:
+   constructor.return_value.sock.getpeercert.return_value=b'wrong-certificate'
+   with self.assertRaises(media.Problem):media.AccountVerifier()('alice-token-fixture')
+   constructor.return_value.request.assert_not_called()
  def test_missing_encryption_key_cannot_replace_existing_collection_key(self):
   with tempfile.TemporaryDirectory() as folder:
    Path(folder,'media.sqlite3').write_bytes(b'fixture-existing')
