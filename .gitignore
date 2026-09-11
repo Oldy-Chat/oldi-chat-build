@@ -51,3 +51,7 @@ tests/assets/speech/
 
 # Generated, checksum-verified offline speech models
 app/src/main/assets/speech/
+
+# Generated offline speech assets; build scripts pin and verify their source.
+app/src/main/assets/speech/*.bin
+app/src/main/assets/whisper-model.json

@@ -8,10 +8,13 @@ android {
   testApplicationId 'chat.oldy.tests'
   minSdk 26
   targetSdk 36
-  versionCode 16
-  versionName '0.6.7-beta'
+  versionCode 17
+  versionName '0.6.8-beta'
   testInstrumentationRunner 'chat.oldy.CryptoInstrumentation'
-  ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }
+  ndk {
+   abiFilters 'arm64-v8a', 'armeabi-v7a'
+   if (providers.gradleProperty('oldiUiTest').isPresent()) abiFilters 'x86_64'
+  }
  }
  signingConfigs {
   beta { storeFile rootProject.file('.keys/beta.jks'); storePassword 'android'; keyAlias 'oldy-beta'; keyPassword 'android' }

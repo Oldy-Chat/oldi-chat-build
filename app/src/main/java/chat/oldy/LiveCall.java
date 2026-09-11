@@ -13,6 +13,7 @@ final class LiveCall {
  static volatile Session current;
  static final ConcurrentLinkedQueue<String> endedCalls=new ConcurrentLinkedQueue<>();
  static synchronized void dial(Context c,String peer){
+  if(ConferenceCall.current!=null){note(c,"Сначала завершите видеозвонок");return;}
   if(current!=null){c.startActivity(new Intent(c,CallActivity.class));return;}
   try{Vault v=ChatService.vault(c);if(peer.equals(v.nick())||!peer.matches("[a-z0-9_]{3,24}"))return;
    if(v.isBlocked(peer))throw new Exception(I18n.t("Собеседник заблокирован"));
@@ -26,6 +27,7 @@ final class LiveCall {
   if(!sid.matches("[a-f0-9-]{36}")||endedCalls.contains(sid))return;
   Session s=current;
   if(op.equals("call_offer")){
+   if(ConferenceCall.current!=null){try{service.signal(peer,new JSONObject().put("op","call_busy").put("sid",sid));}catch(Exception ignored){}return;}
    if(Math.abs(System.currentTimeMillis()-payload.optLong("sent_at"))>90000||payload.optString("sdp").length()>14000)return;
    if(s!=null){if(!s.sid.equals(sid))try{service.signal(peer,new JSONObject().put("op","call_busy").put("sid",sid));}catch(Exception ignored){}return;}
    s=new Session(service,service.vault,peer,sid,true,payload.optString("sdp"));current=s;s.incomingNotice();

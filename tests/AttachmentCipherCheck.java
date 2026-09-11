@@ -1,0 +1,12 @@
+package chat.oldy;
+import java.io.*;import java.nio.file.*;import java.util.*;
+
+/** Includes a real 400 MiB round trip under a 64 MiB JVM heap. */
+public final class AttachmentCipherCheck {
+ static byte value(long at){return (byte)(at*31+(at>>11));}
+ static void check(boolean ok,String text){if(!ok)throw new AssertionError(text);}
+ static byte[] key=new byte[32],iv=new byte[8];
+ static void roundTrip(long size)throws Exception{Path path=Files.createTempFile("oldi-record-test-",".bin");try{InputStream generated=new InputStream(){long at;public int read(){return at<size?value(at++)&255:-1;}public int read(byte[] b,int off,int n){if(at==size)return -1;n=(int)Math.min(n,size-at);for(int i=0;i<n;i++)b[off+i]=value(at++);return n;}};try(OutputStream out=Files.newOutputStream(path)){AttachmentCipher.encrypt(generated,out,size,key,iv);}check(Files.size(path)==AttachmentCipher.encryptedSize(size),"Ciphertext length");long[] at={0};try(InputStream in=Files.newInputStream(path)){AttachmentCipher.decrypt(in,size,key,iv,plain->{for(byte b:plain)check(b==value(at[0]++),"Corrupted plaintext");});}check(at[0]==size,"Truncated output");}finally{Files.deleteIfExists(path);}}
+ static void reject(byte[] bytes,long size)throws Exception{boolean failed=false;try{AttachmentCipher.decrypt(new ByteArrayInputStream(bytes),size,key,iv,plain->{});}catch(Exception expected){failed=true;}check(failed,"Unauthenticated or malformed records accepted");}
+ public static void main(String[] args)throws Exception{new java.security.SecureRandom().nextBytes(key);new java.security.SecureRandom().nextBytes(iv);for(long n:new long[]{1,32768,32769,AttachmentCipher.MAX})roundTrip(n);boolean limit=false;try{AttachmentCipher.encryptedSize(AttachmentCipher.MAX+1);}catch(IOException e){limit=true;}check(limit,"400 MiB limit missing");ByteArrayOutputStream out=new ByteArrayOutputStream();AttachmentCipher.encrypt(new ByteArrayInputStream(new byte[65536]),out,65536,key,iv);byte[] original=out.toByteArray(),tampered=original.clone();tampered[40]^=1;reject(tampered,65536);reject(Arrays.copyOf(original,original.length-1),65536);reject(Arrays.copyOf(original,original.length+1),65536);reject(original,65535);int record=32768+20;byte[] reordered=new byte[original.length];System.arraycopy(original,record,reordered,0,record);System.arraycopy(original,0,reordered,record,record);reject(reordered,65536);System.out.println("ATTACHMENT_CIPHER_PASS: 400 MiB streamed with 64 MiB heap; boundaries, tampering, ordering, truncation and trailing bytes checked");}
+}

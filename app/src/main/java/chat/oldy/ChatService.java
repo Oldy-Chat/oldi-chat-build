@@ -21,11 +21,12 @@ public class ChatService extends Service {
   running=true;incoming=new Thread(this::receive,"oldy-in");outgoing=new Thread(this::send,"oldy-out");incoming.start();outgoing.start();
  }
  void callForeground(boolean calling,String peer){
-  PendingIntent open=PendingIntent.getActivity(this,1,new Intent(this,calling?CallActivity.class:MainActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
+  PendingIntent open=PendingIntent.getActivity(this,1,new Intent(this,calling?(ConferenceCall.current!=null?VideoCallActivity.class:CallActivity.class):MainActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
   Notification.Builder b=new Notification.Builder(this,"connection").setSmallIcon(R.drawable.ic_launcher).setContentTitle(calling?I18n.t("Звонок · @")+peer:I18n.t("OldЫ Chat")).setContentText(calling?I18n.t("Микрофон используется для звонка"):I18n.t("Ожидаем сообщения")).setContentIntent(open).setOngoing(true);
+  ConferenceCall.Session video=ConferenceCall.current;if(calling&&video!=null){PendingIntent endVideo=PendingIntent.getBroadcast(this,423,new Intent(this,CallActionReceiver.class).putExtra("cid",video.id),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);b.addAction(new Notification.Action.Builder(null,"Завершить видеозвонок",endVideo).build());}
   LiveCall.Session call=LiveCall.current;if(calling&&call!=null){PendingIntent end=PendingIntent.getBroadcast(this,412,new Intent(this,CallActionReceiver.class).putExtra("sid",call.sid),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);b.addAction(new Notification.Action.Builder(null,I18n.t("Завершить"),end).build());}
-  if(Build.VERSION.SDK_INT>=34)startForeground(1,b.build(),android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING|(calling?android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE:0));
-  else if(Build.VERSION.SDK_INT>=30)startForeground(1,b.build(),calling?android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE:0);
+  if(Build.VERSION.SDK_INT>=34)startForeground(1,b.build(),android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING|(calling?(android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE|(ConferenceCall.current!=null?android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA:0)):0));
+  else if(Build.VERSION.SDK_INT>=30)startForeground(1,b.build(),calling?(android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE|(ConferenceCall.current!=null?android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA:0)):0);
   else startForeground(1,b.build());
  }
  public int onStartCommand(Intent i,int f,int id){return START_STICKY;}
@@ -46,7 +47,7 @@ public class ChatService extends Service {
      if(!room.isEmpty())vault.putRoom(api.call("/room/"+room,null,vault.token()));
      if(payload.optString("kind").equals("signal")){
       if(!room.isEmpty()){JSONObject r=vault.room(room);boolean member=false;JSONArray members=r.getJSONArray("members");for(int j=0;j<members.length();j++)if(from.equals(members.optString(j)))member=true;if(!member)throw new java.security.GeneralSecurityException("Sender left room");}
-      if(payload.optString("op").startsWith("call_")){if(room.isEmpty()&&!vault.isBlocked(from))LiveCall.receive(this,from,payload);}else if(payload.optString("op").equals("youtube_watch")){if(room.isEmpty()&&!vault.isBlocked(from))YouTubeTogether.receive(this,from,payload);}else if(!vault.isBlocked(from)||!room.isEmpty())rtc.accept(from,payload);
+      if(payload.optString("op").startsWith("vc_")){if(room.isEmpty()&&!vault.isBlocked(from))ConferenceCall.receive(this,from,payload);}else if(payload.optString("op").startsWith("call_")){if(room.isEmpty()&&!vault.isBlocked(from))LiveCall.receive(this,from,payload);}else if(payload.optString("op").equals("youtube_watch")){if(room.isEmpty()&&!vault.isBlocked(from))YouTubeTogether.receive(this,from,payload);}else if(!vault.isBlocked(from)||!room.isEmpty())rtc.accept(from,payload);
      }else{
       boolean fresh=!vault.has(e.getString("id"));vault.receiveDecoded(e,peer,payload);JSONObject m=vault.message(e.getString("id"));
       if(running&&fresh&&m!=null&&!m.optString("kind").equals("control")&&!visibleChat.equals(m.optString("peer")))Notices.show(this,vault,m,peer);
@@ -88,6 +89,6 @@ public class ChatService extends Service {
   }
   JSONArray messages=vault.copy().getJSONArray("messages"),ids=new JSONArray();for(int i=0;i<messages.length()&&ids.length()<100;i++){JSONObject m=messages.getJSONObject(i);if(m.optBoolean("out")&&m.optString("status").equals("stored"))ids.put(m.optString("id"));}if(ids.length()>0){JSONArray delivered=api.call("/receipts",new JSONObject().put("ids",ids),vault.token()).getJSONArray("delivered");for(int i=0;i<delivered.length();i++)vault.delivered(delivered.getString(i));}
  }
- public void onDestroy(){LiveCall.Session call=LiveCall.current;if(call!=null&&call.vault==vault)call.end(I18n.t("Звонок завершён"),false);running=false;if(incoming!=null)incoming.interrupt();if(outgoing!=null)outgoing.interrupt();if(wake!=null&&wake.isHeld())wake.release();if(callback!=null)getSystemService(ConnectivityManager.class).unregisterNetworkCallback(callback);signals.shutdownNow();if(rtc!=null)rtc.close();if(instance==this)instance=null;state="Нет подключения";super.onDestroy();}
+ public void onDestroy(){ConferenceCall.Session video=ConferenceCall.current;if(video!=null&&video.vault==vault)video.end("Видеозвонок завершён",false);LiveCall.Session call=LiveCall.current;if(call!=null&&call.vault==vault)call.end(I18n.t("Звонок завершён"),false);running=false;if(incoming!=null)incoming.interrupt();if(outgoing!=null)outgoing.interrupt();if(wake!=null&&wake.isHeld())wake.release();if(callback!=null)getSystemService(ConnectivityManager.class).unregisterNetworkCallback(callback);signals.shutdownNow();if(rtc!=null)rtc.close();if(instance==this)instance=null;state="Нет подключения";super.onDestroy();}
  public IBinder onBind(Intent i){return null;}
 }

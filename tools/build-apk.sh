@@ -8,6 +8,7 @@ fi
 python3 tools/prepare-speech.py
 bash tools/prepare-tunnel.sh
 bash tools/prepare-dpi.sh
+bash tools/prepare-whisper.sh
 make -C .native/byedpi -j2
 mkdir -p build
 python3 tools/check-dpi.py .native/byedpi/ciadpi | tee build/dpi-results.txt

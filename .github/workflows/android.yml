@@ -1,7 +1,7 @@
 name: Verify Oldi Chat sources
 on:
   push:
-    branches: [main, fix/aeza-in-app-media]
+    branches: [main, fix/aeza-in-app-media, feat/calls-files-notes]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -50,7 +50,7 @@ jobs:
   android:
     needs: source-policy
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,6 +71,8 @@ jobs:
           javac -d build/java-checks app/src/main/java/chat/oldy/AudioDsp.java tests/AudioDspCheck.java app/src/main/java/chat/oldy/YouTubeLinkDetector.java tests/YouTubeLinkCheck.java
           java -cp build/java-checks chat.oldy.AudioDspCheck
           java -cp build/java-checks chat.oldy.YouTubeLinkCheck
+          javac -d build/java-checks app/src/main/java/chat/oldy/AttachmentCipher.java tests/AttachmentCipherCheck.java
+          java -Xmx64m -cp build/java-checks chat.oldy.AttachmentCipherCheck
       - name: Compile Android application and instrumentation sources; run lint
         run: gradle --no-daemon :app:compileReleaseJavaWithJavac :app:compileReleaseAndroidTestJavaWithJavac :app:lintRelease
       - uses: actions/upload-artifact@v4
@@ -86,10 +88,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           sdkmanager 'ndk;28.2.13676358'
-          python3 -m pip install vosk
+          python3 -m pip install vosk aiortc
           python3 tools/prepare-speech.py
           bash tools/prepare-tunnel.sh
           bash tools/prepare-dpi.sh
+          bash tools/prepare-whisper.sh
       - name: Assemble unsigned update for signing on the owner workstation
         if: github.event_name != 'pull_request'
         run: |
@@ -114,6 +117,20 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Free disposable native build files before creating Android userdata
+        if: github.event_name != 'pull_request'
+        run: |
+          sdkmanager --uninstall 'ndk;28.2.13676358'
+          python3 - <<'PY_CLEAN'
+          from pathlib import Path
+          import shutil
+          for name in ('build/whisper-model', 'build/whisper-host', 'build/whisper-arm64-v8a', 'build/whisper-armeabi-v7a', 'build/whisper-x86_64', '.native', 'app/build/intermediates', 'app/src/main/jniLibs'):
+              path = Path(name)
+              if path.is_dir(): shutil.rmtree(path)
+          free = shutil.disk_usage('.').free
+          print('Emulator disk space available:', free)
+          if free < 10 * 1024**3: raise SystemExit('Insufficient disk for Android userdata; stop before waiting for boot')
+          PY_CLEAN
       - name: Verify the new menus and editor on Android
         if: github.event_name != 'pull_request'
         uses: reactivecircus/android-emulator-runner@v2
@@ -126,7 +143,11 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_2
+          disk-size: 4096M
+          emulator-boot-timeout: 300
+          ram-size: 3072M
           disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
           script: bash tools/ci-android-checks.sh
       - uses: actions/upload-artifact@v4
         if: always()
