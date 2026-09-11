@@ -14,7 +14,9 @@ import sys
 import tempfile
 ROOT=Path(__file__).resolve().parents[2]
 HOST='2.56.174.123'
-def adb(*args,check=True):return subprocess.run(['adb',*args],check=check,capture_output=True,text=True,timeout=40)
+def adb(*args,check=True):
+ try:return subprocess.run(['adb',*args],check=check,capture_output=True,text=True,timeout=40)
+ except subprocess.CalledProcessError as error:raise RuntimeError('ADB_'+args[0].upper()+'_FAILED: '+error.stderr.strip()[:200]) from None
 def main():
  key=os.environ.get('AEZA_SSH_PRIVATE_KEY','').strip();known=os.environ.get('AEZA_SSH_KNOWN_HOSTS','').strip();user=os.environ.get('AEZA_SSH_USER','').strip()
  if not key or len(known.split())!=3 or known.split()[:2]!=[HOST,'ssh-ed25519'] or not re.fullmatch('[a-z_][a-z0-9_-]{0,31}',user):raise RuntimeError('SSH_SETUP_REQUIRED')
@@ -44,7 +46,9 @@ def main():
    if not report.get('ready'):raise RuntimeError('VPS_FIXTURE_FAILED')
    (directory/'reference.jpg').write_bytes(base64.b64decode(report['reference']))
    adb('root');adb('wait-for-device')
-   adb('push',str(directory/'reference.jpg'),'/sdcard/Android/data/chat.oldy/files/reference.jpg')
+   # Write as the disposable app UID; adbd root cannot write through scoped-storage FUSE.
+   copied=subprocess.run(['adb','shell',"run-as chat.oldy sh -c 'cat > files/route-reference.jpg'"],input=(directory/'reference.jpg').read_bytes(),capture_output=True,timeout=20)
+   if copied.returncode:raise RuntimeError('APP_REFERENCE_COPY_FAILED')
    adb('shell','appops','set','chat.oldy','ACTIVATE_VPN','allow')
    # DNAT only the existing pinned destination into the authenticated SSH forward.
    # Both public YouTube IPv4/IPv6 and QUIC are blocked on this disposable emulator.

@@ -38,7 +38,7 @@ public class MediaRouteInstrumentation extends Release066Instrumentation {
   YouTubeHubActivity opened=hub;if(opened!=null)runOnMainSync(opened::finish);LocalTunnelService.stop(c);Thread.sleep(2000);
   // Photo edit endpoint, Android decode, preview, account collection save and reload.
   StickerEditorActivity editor=(StickerEditorActivity)launch(new Intent(c,StickerEditorActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),StickerEditorActivity.class);
-  Bitmap photo=BitmapFactory.decodeFile(new File(c.getExternalFilesDir(null),"reference.jpg").getPath());check(photo!=null,"Missing diagnostic reference");
+  Bitmap photo=BitmapFactory.decodeFile(new File(c.getFilesDir(),"route-reference.jpg").getPath());check(photo!=null,"Missing diagnostic reference");
   runOnMainSync(()->{editor.canvas.setImage(photo);editor.generate();});awaitSticker(editor);check(AnimatedStickerCodec.animated(editor.animation),"Photo result is not animated");shot("067-photo-sticker-ready");String id=editor.pending;
   runOnMainSync(()->editor.save(false));until=SystemClock.elapsedRealtime()+30000;while(!editor.isFinishing()&&SystemClock.elapsedRealtime()<until)Thread.sleep(150);check(editor.isFinishing(),"Photo sticker save failed");
   PersonalStickerStore store=new PersonalStickerStore(c,"alice");JSONObject saved=store.read(id);check(saved.getString("owner").equals("alice"),"Wrong sticker owner");check(MediaService.call(c,"/stickers/collection/"+id,null,credential).getString("id").equals(id),"Server collection lost sticker");mark("photo-sticker-created-saved-and-reloaded");
