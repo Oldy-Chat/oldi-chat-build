@@ -117,6 +117,20 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Free disposable native build files before creating Android userdata
+        if: github.event_name != 'pull_request'
+        run: |
+          sdkmanager --uninstall 'ndk;28.2.13676358'
+          python3 - <<'PY_CLEAN'
+          from pathlib import Path
+          import shutil
+          for name in ('build/whisper-model', 'build/whisper-host', 'build/whisper-arm64-v8a', 'build/whisper-armeabi-v7a', 'build/whisper-x86_64', '.native', 'app/build/intermediates', 'app/src/main/jniLibs'):
+              path = Path(name)
+              if path.is_dir(): shutil.rmtree(path)
+          free = shutil.disk_usage('.').free
+          print('Emulator disk space available:', free)
+          if free < 10 * 1024**3: raise SystemExit('Insufficient disk for Android userdata; stop before waiting for boot')
+          PY_CLEAN
       - name: Verify the new menus and editor on Android
         if: github.event_name != 'pull_request'
         uses: reactivecircus/android-emulator-runner@v2
@@ -130,6 +144,8 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disk-size: 4096M
+          emulator-boot-timeout: 300
+          ram-size: 3072M
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
           script: bash tools/ci-android-checks.sh

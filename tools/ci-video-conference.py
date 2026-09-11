@@ -20,7 +20,6 @@ try:
   try:
    connection.request('GET','/test-boot/status');return json.load(connection.getresponse())['polls']
   finally:connection.close()
- before=boot_polls()
  subprocess.run(['adb','reboot'],check=True);subprocess.run(['adb','wait-for-device'],check=True,timeout=75)
  deadline=time.monotonic()+75
  while time.monotonic()<deadline:
@@ -28,6 +27,7 @@ try:
   time.sleep(1)
  else:raise RuntimeError('Emulator did not reboot')
  subprocess.run(['adb','shell','input','keyevent','82'],check=True)
+ before=boot_polls()  # Require a fresh authenticated poll after boot, not a pre-reboot request.
  deadline=time.monotonic()+35
  while time.monotonic()<deadline:
   services=subprocess.check_output(['adb','shell','dumpsys','activity','services','chat.oldy/.ChatService'],text=True)
